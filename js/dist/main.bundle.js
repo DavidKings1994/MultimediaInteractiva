@@ -44,32 +44,9 @@
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(2), __webpack_require__(3)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, THREE, graphics) {
+	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(2), __webpack_require__(3)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, THREE, KingsGame) {
 		$(document).ready(function() {
-	        var scene = new THREE.Scene();
-	        var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
-
-	        var renderer = new THREE.WebGLRenderer();
-	        renderer.setSize( window.innerWidth, window.innerHeight );
-	        document.body.appendChild( renderer.domElement );
-
-	        var geometry = new THREE.BoxGeometry( 1, 1, 1 );
-	        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-	        var cube = new THREE.Mesh( geometry, material );
-	        scene.add( cube );
-
-	        camera.position.z = 5;
-
-	        var render = function () {
-	            requestAnimationFrame( render );
-
-	            cube.rotation.x += 0.1;
-	            cube.rotation.y += 0.1;
-
-	            renderer.render(scene, camera);
-	        };
-
-	        render();
+			$("#gameContainer").initGame();
 	    });
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
@@ -51999,9 +51976,64 @@
 /* 3 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(2)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, THREE) {
-	        
-	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;(function(root, factory) {
+	    'use strict';
+	    if (true) {
+	        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(2)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory), __WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ? (__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+	    } else if (typeof exports !== 'undefined') {
+	        module.exports = factory(require('jquery','three'));
+	    } else {
+	        root.myModule = factory(root.jquery, root.three);
+	    }
+	}(this, function($, THREE) {
+	    'use strict';
+	    var KingsGame = window.KingsGame || {};
+
+	    var KingsGame = ( function() {
+	        function KingsGame() {
+	            var _ = this, dataSettings;
+	            _.init(true);
+	        }
+	        return KingsGame;
+	    }());
+
+	    KingsGame.prototype.render = function () {
+	        requestAnimationFrame( KingsGame.prototype.render );
+
+	        var cube = KingsGame.scene.getObjectByName( "cube" );
+	        cube.rotation.x += 0.1;
+	        cube.rotation.y += 0.1;
+
+	        KingsGame.renderer.render(KingsGame.scene, KingsGame.camera);
+	    };
+
+	    KingsGame.prototype.onWindowResize = function() {
+	        KingsGame.camera.aspect = window.innerWidth / window.innerHeight;
+	        KingsGame.camera.updateProjectionMatrix();
+	        KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
+	    }
+
+	    $.fn.initGame = function() {
+	        KingsGame.scene = new THREE.Scene();
+	        KingsGame.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+
+	        KingsGame.renderer = new THREE.WebGLRenderer();
+	        KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
+	        $(this).append( KingsGame.renderer.domElement );
+
+	        var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+	        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+	        var cube = new THREE.Mesh( geometry, material );
+	        cube.name = "cube";
+	        KingsGame.scene.add( cube );
+
+	        KingsGame.camera.position.z = 5;
+
+	        window.addEventListener( 'resize', KingsGame.prototype.onWindowResize, false );
+
+	        KingsGame.prototype.render();
+	    };
+	}));
 
 
 /***/ }
