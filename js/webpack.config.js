@@ -13,7 +13,7 @@ module.exports = {
             'Backbone': __dirname + '/../node_modules/backbone/backbone.js',
             'underscore': __dirname + '/../node_modules/underscore/underscore.js',
             'three': __dirname + '/../node_modules/three/build/three.js',
-            'cannon': __dirname + '/../node_modules/cannon/build/cannon.js'
+            'cannon': __dirname + '/../node_modules/cannon/build/cannon.demo.js'
         }
     },
     module: {
