@@ -1,30 +1,62 @@
 (function(root, factory) {
     'use strict';
     if (typeof define === 'function' && define.amd) {
-        define(['jquery','three','cannon'], factory);
+        define(['jquery','three','underscore','cannon'], factory);
     } else if (typeof exports !== 'undefined') {
-        module.exports = factory(require('jquery','three','cannon'));
+        module.exports = factory(require('jquery','three','underscore','cannon'));
     } else {
-        root.myModule = factory(root.jquery, root.three);
+        root.myModule = factory(root.jquery, root.three, root.underscore, root.cannon);
     }
-}(this, function($, THREE, CANNON) {
+}(this, function($, THREE, _, CANNON) {
     'use strict';
     var KingsGame = window.KingsGame || {};
 
     var KingsGame = ( function() {
         function KingsGame() {
-            var _ = this, dataSettings;
-            _.init(true);
+            var self = this, dataSettings;
+            self.init(true);
         }
         return KingsGame;
     }());
 
-    KingsGame.prototype.update = function () {
+    KingsGame.GameObject = function(position, movable) {
+        var shape = new CANNON.Box( new CANNON.Vec3(1,1,1) );
+        this.body = new CANNON.Body({
+            mass: 1,
+            position: new CANNON.Vec3(position.x, position.y, position.z)
+        });
+        this.body.addShape(shape);
+        this.body.angularVelocity.set(0,10,0);
+        this.body.angularDamping = 0.5;
+        KingsGame.world.addBody( this.body );
+
+        var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+        this.mesh = new THREE.Mesh( geometry, material );
+        this.mesh.position.copy( this.mesh.position );
+        this.mesh.quaternion.copy( this.mesh.quaternion );
+        KingsGame.scene.add( this.mesh );
+    };
+
+    KingsGame.GameObject.prototype = {
+        constructor: KingsGame.GameObject,
+
+        update: function() {
+            this.mesh.position.copy( this.body.position );
+            this.mesh.quaternion.copy( this.body.quaternion );
+        }
+    };
+
+    KingsGame.prototype.updatePhysics = function () {
         KingsGame.world.step( KingsGame.timeStep );
-        var cube = KingsGame.scene.getObjectByName( "cube" );
-        var rigid = KingsGame.world.bodies[0];
-        cube.position.copy( rigid.position );
-        cube.quaternion.copy( rigid.quaternion );
+        var elements = _.toArray(KingsGame.gameobjects);
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].update();
+        }
+    };
+
+    KingsGame.prototype.update = function () {
+        KingsGame.prototype.updatePhysics();
     };
 
     KingsGame.prototype.render = function () {
@@ -154,7 +186,6 @@
         KingsGame.timeStep = 1.0 / 60.0;
         KingsGame.paused = true;
 
-        //CannonJS initialization
         KingsGame.world = new CANNON.World();
         KingsGame.world.gravity.set(0,0,-9.82);
         KingsGame.world.broadphase = new CANNON.NaiveBroadphase();
@@ -167,25 +198,13 @@
         KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
         $(this).append( KingsGame.renderer.domElement );
 
-        var geometry = new THREE.BoxGeometry( 1, 1, 1 );
-        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-        var cube = new THREE.Mesh( geometry, material );
-        cube.name = "cube";
-        KingsGame.scene.add( cube );
+        KingsGame.gameobjects = {
+            "cube1" : new KingsGame.GameObject(new THREE.Vector3(0,0,2), false),
+            "cube2" : new KingsGame.GameObject(new THREE.Vector3(0,0,1), false)
+        };
 
-        var shape = new CANNON.Box( new CANNON.Vec3(1,1,1) );
-        var body = new CANNON.Body({
-            mass: 1,
-            position: new CANNON.Vec3(0,0,1)
-        });
-        body.addShape(shape);
-        body.angularVelocity.set(0,10,0);
-        body.angularDamping = 0.5;
-        KingsGame.world.addBody( body );
-
-        // Create a plane
         var groundBody = new CANNON.Body({
-            mass: 0, // mass == 0 makes the body static
+            mass: 0,
             position: new CANNON.Vec3(0,0,-2)
         });
         var groundShape = new CANNON.Plane();

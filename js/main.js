@@ -1,4 +1,4 @@
-define(['jquery',"three", "./game/KingsGame"],  function($, THREE, KingsGame) {
+define(['jquery', "./game/KingsGame"],  function($, KingsGame) {
 	$(document).ready(function() {
 		$("#gameContainer").initGame(true);
     });
