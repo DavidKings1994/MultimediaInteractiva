@@ -19,20 +19,22 @@
         return KingsGame;
     }());
 
-    KingsGame.GameObject = function(position, movable) {
-        var shape = new CANNON.Box( new CANNON.Vec3(1,1,1) );
+    KingsGame.GameObject = function(position, weight) {
+        var shape = new CANNON.Box( new CANNON.Vec3(0.5,0.5,0.5) );
         this.body = new CANNON.Body({
-            mass: 1,
+            mass: weight,
             position: new CANNON.Vec3(position.x, position.y, position.z)
         });
         this.body.addShape(shape);
-        this.body.angularVelocity.set(0,10,0);
+        this.body.angularVelocity.set(0,3,0);
         this.body.angularDamping = 0.5;
         KingsGame.world.addBody( this.body );
 
         var geometry = new THREE.BoxGeometry( 1, 1, 1 );
-        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+        var material = new THREE.MeshPhongMaterial( { color: 0x00ff00 } );
         this.mesh = new THREE.Mesh( geometry, material );
+        this.mesh.castShadow = true;
+		this.mesh.receiveShadow = true;
         this.mesh.position.copy( this.mesh.position );
         this.mesh.quaternion.copy( this.mesh.quaternion );
         KingsGame.scene.add( this.mesh );
@@ -64,6 +66,7 @@
         if(!KingsGame.paused) {
             KingsGame.prototype.update();
         }
+        KingsGame.renderer.clear();
         KingsGame.renderer.render(KingsGame.scene, KingsGame.camera);
     };
 
@@ -192,15 +195,70 @@
         KingsGame.world.solver.iterations = 10;
 
         KingsGame.scene = new THREE.Scene();
+        KingsGame.scene.fog = new THREE.Fog( 0xffffff, 1, 5000 );
+		KingsGame.scene.fog.color.setHSL( 0.6, 0, 1 );
+		var ambient = new THREE.AmbientLight( 0x444444 );
+		KingsGame.scene.add( ambient );
+
+		var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
+		hemiLight.color.setHSL( 0.6, 1, 0.6 );
+		hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
+		hemiLight.position.set( 0, 0, 500 );
+		KingsGame.scene.add( hemiLight );
+
+        var dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
+		dirLight.color.setHSL( 0.1, 1, 0.95 );
+		dirLight.position.set( -10, 10, 10 );
+		dirLight.position.multiplyScalar( 50 );
+		dirLight.castShadow = true;
+		dirLight.shadow.mapSize.width = 2048;
+		dirLight.shadow.mapSize.height = 2048;
+		var d = 5;
+		dirLight.shadow.camera.left = -d;
+		dirLight.shadow.camera.right = d;
+		dirLight.shadow.camera.top = d;
+		dirLight.shadow.camera.bottom = -d;
+		dirLight.shadow.camera.far = 3500;
+		dirLight.shadow.bias = -0.0001;
+		KingsGame.scene.add( dirLight );
+
+		var vertexShader = document.getElementById( 'vertexShader' ).textContent;
+		var fragmentShader = document.getElementById( 'fragmentShader' ).textContent;
+		var uniforms = {
+			topColor: 	 { type: "c", value: new THREE.Color( 0x0077ff ) },
+			bottomColor: { type: "c", value: new THREE.Color( 0xffffff ) },
+			offset:		 { type: "f", value: 33 },
+			exponent:	 { type: "f", value: 0.6 }
+		};
+		uniforms.topColor.value.copy( hemiLight.color );
+		KingsGame.scene.fog.color.copy( uniforms.bottomColor.value );
+
+		var skyGeo = new THREE.SphereGeometry( 400, 32, 15 );
+		var skyMat = new THREE.ShaderMaterial( { vertexShader: vertexShader, fragmentShader: fragmentShader, uniforms: uniforms, side: THREE.BackSide } );
+		var sky = new THREE.Mesh( skyGeo, skyMat );
+		KingsGame.scene.add( sky );
+
         KingsGame.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
 
-        KingsGame.renderer = new THREE.WebGLRenderer();
+        KingsGame.renderer = new THREE.WebGLRenderer( { antialias: true } );
         KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
+        KingsGame.renderer.setPixelRatio( window.devicePixelRatio );
+        KingsGame.renderer.shadowMap.enabled = true;
+        KingsGame.renderer.shadowMapSoft = true;
+        KingsGame.renderer.shadowCameraNear = 3;
+        KingsGame.renderer.shadowCameraFar = KingsGame.camera.far;
+        KingsGame.renderer.shadowCameraFov = 50;
+        KingsGame.renderer.shadowMapBias = 0.0039;
+        KingsGame.renderer.shadowMapDarkness = 0.5;
+        KingsGame.renderer.shadowMapWidth = 1024;
+        KingsGame.renderer.shadowMapHeight = 1024;
+		KingsGame.renderer.shadowMap.type = THREE.PCFShadowMap;
+        KingsGame.renderer.autoClear = false;
         $(this).append( KingsGame.renderer.domElement );
 
         KingsGame.gameobjects = {
-            "cube1" : new KingsGame.GameObject(new THREE.Vector3(0,0,2), false),
-            "cube2" : new KingsGame.GameObject(new THREE.Vector3(0,0,1), false)
+            "cube1" : new KingsGame.GameObject(new THREE.Vector3(0,0,4), 2),
+            "cube2" : new KingsGame.GameObject(new THREE.Vector3(0,0,1), 1)
         };
 
         var groundBody = new CANNON.Body({
@@ -210,6 +268,15 @@
         var groundShape = new CANNON.Plane();
         groundBody.addShape( groundShape );
         KingsGame.world.addBody( groundBody );
+
+        var geometry = new THREE.PlaneGeometry( 100, 100 );
+        var material = new THREE.MeshPhongMaterial( { color: 0xffdd99 } );
+        var mesh = new THREE.Mesh( geometry, material );
+        mesh.position.copy( groundBody.position );
+        mesh.quaternion.copy( groundBody.quaternion );
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        KingsGame.scene.add( mesh );
 
         KingsGame.camera.position.set(0,5,0);
         KingsGame.camera.up = new THREE.Vector3(0,0,1);
