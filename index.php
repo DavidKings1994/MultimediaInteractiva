@@ -12,7 +12,7 @@
 		varying vec3 vWorldPosition;
 		void main() {
 			vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
-			vWorldPosition = worldPosition.xyz;
+			vWorldPosition = worldPosition.xzy;
 			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 		}
 	</script>
@@ -30,15 +30,14 @@
 	</script>
     <div id="blocker">
         <div id="instructions">
-			<span style="font-size:40px">Click to play</span>
+			<span>Click to play</span>
 			<br />
 			(W, A, S, D = Move, MOUSE = Look around)
 		</div>
     </div>
     <div id="scoreContainer">
 		<div id="score">
-			<span style="font-size:40px">Puntuacion:</span>
-			<br />
+			<span>Puntuacion: </span>
 			<span id="puntuacion">0</span>
 		</div>
 	</div>
