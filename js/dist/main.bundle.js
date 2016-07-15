@@ -10115,6 +10115,7 @@
 
 	    __webpack_require__(6);
 	    __webpack_require__(7);
+	    __webpack_require__(8);
 
 	    var KingsGame = ( function() {
 	        function KingsGame() {
@@ -10129,6 +10130,7 @@
 	        this.scale = parameters.scale || new THREE.Vector3(1,1,1);
 	        this.position = parameters.position || new THREE.Vector3(0,0,0);
 	        this.direction = parameters.direction || new THREE.Vector3(0,-5,0);
+	        this.soundPath = parameters.soundPath || "";
 
 	        if(parameters.useMTL) {
 	            this.loadObjMtl( parameters.modelPath, parameters.fileName );
@@ -10136,7 +10138,7 @@
 	            this.loadObj( parameters.modelPath, parameters.fileName );
 	        }
 
-	        var shape = new CANNON.Box( new CANNON.Vec3(0.5,0.5,0.5) );
+	        var shape = new CANNON.Box( new CANNON.Vec3(1,1,1) );
 	        this.body = new CANNON.Body({
 	            mass: parameters.weight,
 	            position: new CANNON.Vec3(
@@ -10157,7 +10159,6 @@
 	        constructor: KingsGame.GameObject,
 
 	        update: function() {
-	            //this.body.force.set(0,0,9.82*4);
 	            this.position.copy( this.body.position );
 	            this.model.position.copy( this.body.position );
 	            this.model.quaternion.copy( this.body.quaternion );
@@ -10167,6 +10168,9 @@
 	            this.model.scale.x = this.scale.x;
 	            this.model.scale.y = this.scale.y;
 	            this.model.scale.z = this.scale.z;
+	            if(this.soundAnalyser != null) {
+	                this.model.children[0].material.emissive.b = this.soundAnalyser.getAverageFrequency() / 256;
+	            }
 	        },
 
 	        onProgress: function ( xhr ) {
@@ -10185,6 +10189,9 @@
 	            this.model.castShadow = true;
 	            this.model.receiveShadow = true;
 	            this.update();
+	            if(this.soundPath != "") {
+	                this.bindSound('./assets/sounds/running_hell.mp3');
+	            }
 	            KingsGame.scene.add( this.model );
 	        },
 
@@ -10214,6 +10221,7 @@
 				mtlLoader.load( file+'.mtl', function( materials ) {
 					materials.preload();
 	                var objLoader = new THREE.OBJLoader();
+	                console.log(objLoader);
 	                objLoader.setPath( path );
 	                objLoader.setMaterials( materials );
 	                objLoader.load( file+'.obj', function ( object ) {
@@ -10235,34 +10243,46 @@
 
 	        set Model(model) {
 	            this.model = model;
-	        }
+	        },
+
+	        bindSound: function(soundPath) {
+	            var audioLoader = new THREE.AudioLoader();
+	            var sound = new THREE.PositionalAudio( KingsGame.listener );
+	    		audioLoader.load( soundPath, function( buffer ) {
+	    			sound.setBuffer( buffer );
+	    			sound.setRefDistance( 20 );
+	    			sound.play();
+	    		});
+	    		this.model.add( sound );
+	            this.soundAnalyser = new THREE.AudioAnalyser( sound, 32 );
+	        },
 	    };
 
 	    KingsGame.Player = function(parameters) {
 	        KingsGame.GameObject.apply(this, arguments);
 
-	        this.mass = parameters.mass || 1;
+	        this.mass = parameters.weight || 1;
 	        this.maxSteerVal = Math.PI / 8;
 	        this.maxSpeed = 5;
 	        this.maxForce = 50;
+	        this.turning = 0;
 
 	        var chassisShape;
-	        var centerOfMassAdjust = new CANNON.Vec3(0, 0, -1);
+	        var centerOfMassAdjust = new CANNON.Vec3(0, 0, 1);
 	        chassisShape = new CANNON.Box(new CANNON.Vec3(1, 4, 1));
 	        var chassisBody = new CANNON.Body({ mass: 20 });
 	        chassisBody.addShape(chassisShape, centerOfMassAdjust);
 	        chassisBody.position.set(this.position.x, this.position.y, this.position.z);
+	        chassisBody.position.vadd(centerOfMassAdjust);
 	        KingsGame.world.removeBody(this.body);
 	        this.body = chassisBody;
-
-	        console.log(this);
 
 	        this.vehicle = new CANNON.RigidVehicle({
 	            chassisBody: chassisBody
 	        });
 
-	        var axisWidth = 5;
-	        var wheelShape = new CANNON.Sphere(1.5);
+	        var axisWidth = 4;
+	        var wheelShape = new CANNON.Sphere(0.5);
 	        var down = new CANNON.Vec3(0, 0, -1);
 	        var wheelMaterial = new CANNON.Material("wheelMaterial");
 
@@ -10270,7 +10290,7 @@
 	        wheelBody.addShape(wheelShape);
 	        this.vehicle.addWheel({
 	            body: wheelBody,
-	            position: new CANNON.Vec3(axisWidth/2, 4, 0).vadd(centerOfMassAdjust),
+	            position: new CANNON.Vec3(axisWidth/2, 4, 0),
 	            axis: new CANNON.Vec3(1, 0, 0),
 	            direction: down
 	        });
@@ -10279,7 +10299,7 @@
 	        wheelBody.addShape(wheelShape);
 	        this.vehicle.addWheel({
 	            body: wheelBody,
-	            position: new CANNON.Vec3(-axisWidth/2, 4, 0).vadd(centerOfMassAdjust),
+	            position: new CANNON.Vec3(-axisWidth/2, 4, 0),
 	            axis: new CANNON.Vec3(-1, 0, 0),
 	            direction: down
 	        });
@@ -10288,7 +10308,7 @@
 	        wheelBody.addShape(wheelShape);
 	        this.vehicle.addWheel({
 	            body: wheelBody,
-	            position: new CANNON.Vec3(axisWidth/2, -4, 0).vadd(centerOfMassAdjust),
+	            position: new CANNON.Vec3(axisWidth/2, -4, 0),
 	            axis: new CANNON.Vec3(1, 0, 0),
 	            direction: down
 	        });
@@ -10297,7 +10317,7 @@
 	        wheelBody.addShape(wheelShape);
 	        this.vehicle.addWheel({
 	            body: wheelBody,
-	            position: new CANNON.Vec3(-axisWidth/2, -4, 0).vadd(centerOfMassAdjust),
+	            position: new CANNON.Vec3(-axisWidth/2, -4, 0),
 	            axis: new CANNON.Vec3(-1, 0, 0),
 	            direction: down
 	        });
@@ -10315,7 +10335,6 @@
 
 	    KingsGame.Player.prototype.update = function() {
 	        KingsGame.GameObject.prototype.update.call(this);
-	        console.log(this.direction);
 	        for (var i = 0; i < this.model.children.length; i++) {
 	            if(
 	                this.model.children[i].name == "Car_Con_Box_Cube.014" ||
@@ -10327,18 +10346,45 @@
 	                this.model.children[i].visible = false;
 	            }
 	            if(this.model.children[i].name == "Front_Steering_Mesh_2_R_Cube.004") { //front right wheel
-	                //this.model.children[i].rotateX(this.vehicle.getWheelSpeed(0)*(Math.PI/180));
+	                this.model.children[i].geometry.center();
+	                this.model.children[i].geometry.translate(1.3,0.6,-2.55);
+	                this.model.children[i].geometry.rotateX(-this.vehicle.getWheelSpeed(0)*(Math.PI/180));
+	                this.model.children[i].rotation.set(this.vehicle.getWheelSpeed(0)*(Math.PI/180),0,0);
+	                this.model.children[i].updateMatrix();
+	                this.model.children[i].geometry.applyMatrix( this.model.children[i].matrix );
+	                this.model.children[i].geometry.center();
+	                this.model.children[i].geometry.translate(1.3,0.6,-2.55);
+	                this.model.children[i].geometry.rotateY(-this.turning*(Math.PI/180));
+	                this.model.children[i].rotation.set(0,this.turning*(Math.PI/180),0);
+	                this.model.children[i].updateMatrix();
 	            }
 	            if(this.model.children[i].name == "Front_Wheel_Mesh_2_L_Cube.009") { //front left wheel
-	                //this.model.children[i].rotateX(this.vehicle.getWheelSpeed(1)*(Math.PI/180));
+	                this.model.children[i].geometry.center();
+	                this.model.children[i].geometry.translate(-1.3,0.6,-2.55);
+	                this.model.children[i].geometry.rotateX(this.vehicle.getWheelSpeed(1)*(Math.PI/180));
+	                this.model.children[i].rotation.set(-this.vehicle.getWheelSpeed(1)*(Math.PI/180),0,0);
+	                this.model.children[i].updateMatrix();
+	                this.model.children[i].geometry.applyMatrix( this.model.children[i].matrix );
+	                this.model.children[i].geometry.center();
+	                this.model.children[i].geometry.translate(-1.3,0.6,-2.55);
+	                this.model.children[i].geometry.rotateY(-this.turning*(Math.PI/180));
+	                this.model.children[i].rotation.set(0,this.turning*(Math.PI/180),0);
+	                this.model.children[i].updateMatrix();
 	            }
 	            if(this.model.children[i].name == "Back_Wheel_Mesh_1_R_Cube.003") { //back right wheel
-	                //this.model.children[i].rotateX(this.vehicle.getWheelSpeed(2)*(Math.PI/180));
+	                this.model.children[i].geometry.center();
+	                this.model.children[i].geometry.translate(1.7,0.6,2.2);
+	                this.model.children[i].geometry.rotateX(-this.vehicle.getWheelSpeed(2)*(Math.PI/180));
+	                this.model.children[i].rotation.set(this.vehicle.getWheelSpeed(2)*(Math.PI/180),0,0);
 	            }
 	            if(this.model.children[i].name == "Back_Wheel_Mesh_1_L_Cube.002") { //back left wheel
-	                //this.model.children[i].rotateX(this.vehicle.getWheelSpeed(3)*(Math.PI/180));
+	                this.model.children[i].geometry.center();
+	                this.model.children[i].geometry.translate(-1.7,0.6,2.2);
+	                this.model.children[i].geometry.rotateX(this.vehicle.getWheelSpeed(3)*(Math.PI/180));
+	                this.model.children[i].rotation.set(-this.vehicle.getWheelSpeed(3)*(Math.PI/180),0,0);
 	            }
 	        }
+	        this.turning = 0;
 	    };
 
 	    KingsGame.Player.prototype.getDirection = function() {
@@ -10350,15 +10396,14 @@
 
 	    KingsGame.prototype.updatePhysics = function () {
 	        KingsGame.world.step( KingsGame.timeStep );
-	        var elements = _.toArray(KingsGame.gameobjects);
-	        for (var i = 0; i < elements.length; i++) {
-	            elements[i].update();
-	        }
 	    };
 
 	    KingsGame.prototype.update = function () {
 	        KingsGame.prototype.updatePhysics();
-	        KingsGame.gameobjects.player.update();
+	        var elements = _.toArray(KingsGame.gameobjects);
+	        for (var i = 0; i < elements.length; i++) {
+	            elements[i].update();
+	        }
 	        if(KingsGame.firstPerson) {
 	            var fixedVec = new THREE.Vector3(0,-1.5,1.5);
 	            fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
@@ -10374,6 +10419,13 @@
 	            KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
 	            KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
 	        }
+	        KingsGame.dirLight.position.set(
+	            KingsGame.gameobjects.player.position.x,
+	            KingsGame.gameobjects.player.position.y,
+	            KingsGame.gameobjects.player.position.z + 20
+	        );
+	        KingsGame.dirLight.target.position.copy(KingsGame.gameobjects.player.position);
+	        KingsGame.dirLight.shadow.camera.updateProjectionMatrix();
 	    };
 
 	    KingsGame.prototype.render = function () {
@@ -10475,11 +10527,17 @@
 	        case 39: // right
 	            KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 0);
 	            KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 1);
+	            if(KingsGame.gameobjects.player.turning < 45) {
+	                KingsGame.gameobjects.player.turning++;
+	            }
 	            break;
 
 	        case 37: // left
 	            KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 0);
 	            KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 1);
+	            if(KingsGame.gameobjects.player.turning > -45) {
+	                KingsGame.gameobjects.player.turning--;
+	            }
 	            break;
 
 	        }
@@ -10503,12 +10561,93 @@
 	        KingsGame.prototype.keyHandler( event );
 	    };
 
-	    KingsGame.prototype.rotateVector = function( vector, quaternion ) {
-	    	var quaternionVec = new CANNON.Quaternion(vector.x, vector.y, vector.z, 0);
-	    	var quaternionCon = quaternion.conjugate();
-	    	var newQuat = quaternion.mult(quaternionVec);
-	    	newQuat = newQuat.mult(quaternionCon);
-	    	return new CANNON.Vec3(newQuat.x, newQuat.y, newQuat.z);
+	    KingsGame.prototype.bindSoundToMesh = function(mesh, soundPath) {
+	        var audioLoader = new THREE.AudioLoader();
+	        var sound = new THREE.PositionalAudio( KingsGame.listener );
+			audioLoader.load( soundPath, function( buffer ) {
+				sound2.setBuffer( buffer );
+				sound2.setRefDistance( 20 );
+				sound2.play();
+			});
+			mesh.add( sound );
+	    };
+
+	    KingsGame.prototype.initGround = function() {
+	        THREE.crossOrigin = "";
+	        var groundMaterial = new CANNON.Material("groundMaterial");
+	        var wheelMaterial = new CANNON.Material("wheelMaterial");
+	        var wheelGroundContactMaterial = window.wheelGroundContactMaterial = new CANNON.ContactMaterial(wheelMaterial, groundMaterial, {
+	            friction: 0.3,
+	            restitution: 0,
+	            contactEquationStiffness: 1000
+	        });
+	        KingsGame.world.addContactMaterial(wheelGroundContactMaterial);
+	        var groundBody = new CANNON.Body({
+	            mass: 0,
+	            position: new CANNON.Vec3(0,0,-10),
+	            material: groundMaterial
+	        });
+	        var groundShape = new CANNON.Plane();
+	        groundBody.addShape( groundShape );
+	        KingsGame.world.addBody( groundBody );
+
+	        var bmap = THREE.ImageUtils.loadTexture("./assets/textures/ground_b.png");
+	        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
+	        bmap.repeat.set( 10, 10 );
+	        var smap = THREE.ImageUtils.loadTexture("./assets/textures/ground_d.jpg");
+	        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
+	        smap.repeat.set( 10, 10 );
+	        var groundTexture = new THREE.MeshPhongMaterial({
+	            shininess  :  0,
+	            bumpMap    :  bmap,
+	            map        :  smap,
+	            bumpScale  :  0.45,
+	        });
+	        var geometry = new THREE.PlaneGeometry( 100, 100 );
+	        var mesh = new THREE.Mesh( geometry, groundTexture );
+	        mesh.position.copy( groundBody.position );
+	        mesh.quaternion.copy( groundBody.quaternion );
+	        mesh.receiveShadow = true;
+	        KingsGame.scene.add( mesh );
+	    };
+
+	    KingsGame.prototype.initGameObjects = function() {
+	        KingsGame.gameobjects = {
+	            "player" : new KingsGame.Player({
+	                modelPath: './assets/models/car/',
+	                fileName: 'car',
+	                useMTL: true,
+	                position: new THREE.Vector3(0,0,0),
+	                rotation: new THREE.Vector3(90,180,0),
+	                scale: new THREE.Vector3(1,1,1),
+	                weight: 4
+	            }),
+	            "crate1" : new KingsGame.GameObject({
+	                modelPath: './assets/models/crate/',
+	                fileName: 'crate',
+	                useMTL: true,
+	                position: new THREE.Vector3(-1,20,0),
+	                scale: new THREE.Vector3(1,1,1),
+	                weight: 4
+	            }),
+	            "crate2" : new KingsGame.GameObject({
+	                modelPath: './assets/models/crate/',
+	                fileName: 'crate',
+	                useMTL: true,
+	                position: new THREE.Vector3(1,20,0),
+	                scale: new THREE.Vector3(1,1,1),
+	                weight: 4
+	            }),
+	            "crate3" : new KingsGame.GameObject({
+	                modelPath: './assets/models/crate/',
+	                fileName: 'crate',
+	                useMTL: true,
+	                position: new THREE.Vector3(0,20,2),
+	                scale: new THREE.Vector3(1,1,1),
+	                weight: 4,
+	                soundPath: './assets/sounds/running_hell.mp3'
+	            }),
+	        };
 	    };
 
 	    $.fn.initGame = function( pointerLocked ) {
@@ -10527,30 +10666,8 @@
 	        KingsGame.world.broadphase = new CANNON.SAPBroadphase(KingsGame.world);
 	        KingsGame.world.solver.iterations = 10;
 	        KingsGame.world.defaultContactMaterial.friction = 0.2;
-	        var groundMaterial = new CANNON.Material("groundMaterial");
-	        var wheelMaterial = new CANNON.Material("wheelMaterial");
-	        var wheelGroundContactMaterial = window.wheelGroundContactMaterial = new CANNON.ContactMaterial(wheelMaterial, groundMaterial, {
-	            friction: 0.3,
-	            restitution: 0,
-	            contactEquationStiffness: 1000
-	        });
-	        KingsGame.world.addContactMaterial(wheelGroundContactMaterial);
-	        var groundBody = new CANNON.Body({
-	            mass: 0,
-	            position: new CANNON.Vec3(0,0,-10),
-	            material: groundMaterial
-	        });
-	        var groundShape = new CANNON.Plane();
-	        groundBody.addShape( groundShape );
-	        KingsGame.world.addBody( groundBody );
 
-	        var geometry = new THREE.PlaneGeometry( 100, 100 );
-	        var material = new THREE.MeshPhongMaterial( { color: 0xffdd99 } );
-	        var mesh = new THREE.Mesh( geometry, material );
-	        mesh.position.copy( groundBody.position );
-	        mesh.quaternion.copy( groundBody.quaternion );
-	        mesh.receiveShadow = true;
-	        KingsGame.scene.add( mesh );
+	        KingsGame.prototype.initGround();
 
 	        var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
 	        hemiLight.color.setHSL( 0.6, 1, 0.6 );
@@ -10558,23 +10675,25 @@
 	        hemiLight.position.set( 0, 0, 500 );
 	        KingsGame.scene.add( hemiLight );
 
-	        var dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
-	        dirLight.color.setHSL( 0.1, 1, 0.95 );
-	        dirLight.position.set( 0, -10, 10 );
-	        dirLight.castShadow = true;
-	        dirLight.shadow.mapSize.width = 2048;
-	        dirLight.shadow.mapSize.height = 2048;
+	        KingsGame.dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
+	        KingsGame.dirLight.color.setHSL( 0.1, 1, 0.95 );
+	        KingsGame.dirLight.position.set( 0, -10, 10 );
+	        KingsGame.dirLight.target.position.set(0,0,0);
+	        KingsGame.scene.add( KingsGame.dirLight.target );
+	        KingsGame.dirLight.castShadow = true;
+	        KingsGame.dirLight.shadow.mapSize.width = 2048;
+	        KingsGame.dirLight.shadow.mapSize.height = 2048;
 	        var d = 20;
-	        dirLight.shadow.camera.left = -d;
-	        dirLight.shadow.camera.right = d;
-	        dirLight.shadow.camera.top = d;
-	        dirLight.shadow.camera.bottom = -d;
-	        dirLight.shadow.camera.near = 3;
-	        dirLight.shadow.camera.far = 50;
-	        dirLight.shadow.camera.fov = 50;
-	        dirLight.shadow.bias = -0.0001;
-	        dirLight.shadow.camera.visible = true;
-	        KingsGame.scene.add( dirLight );
+	        KingsGame.dirLight.shadow.camera.left = -d;
+	        KingsGame.dirLight.shadow.camera.right = d;
+	        KingsGame.dirLight.shadow.camera.top = d;
+	        KingsGame.dirLight.shadow.camera.bottom = -d;
+	        KingsGame.dirLight.shadow.camera.near = 3;
+	        KingsGame.dirLight.shadow.camera.far = 50;
+	        KingsGame.dirLight.shadow.camera.fov = 50;
+	        KingsGame.dirLight.shadow.bias = -0.0001;
+	        KingsGame.dirLight.shadow.camera.visible = true;
+	        KingsGame.scene.add( KingsGame.dirLight );
 
 	        var vertexShader = document.getElementById( 'vertexShader' ).textContent;
 	        var fragmentShader = document.getElementById( 'fragmentShader' ).textContent;
@@ -10597,6 +10716,18 @@
 	        KingsGame.camera.up = new THREE.Vector3(0,0,1);
 	        KingsGame.camera.lookAt(new THREE.Vector3(0,0,0));
 
+	        KingsGame.listener = new THREE.AudioListener();
+			KingsGame.camera.add( KingsGame.listener );
+
+	        var audioLoader = new THREE.AudioLoader();
+	        var sound = new THREE.Audio( KingsGame.listener );
+			audioLoader.load( './assets/sounds/running_hell.mp3', function( buffer ) {
+				sound.setBuffer( buffer );
+				sound.setLoop(true);
+				sound.setVolume(0.0);
+				sound.play();
+			});
+
 	        KingsGame.renderer = new THREE.WebGLRenderer( { antialias: true } );
 	        KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
 	        KingsGame.renderer.setPixelRatio( window.devicePixelRatio );
@@ -10606,17 +10737,7 @@
 	        KingsGame.renderer.autoClear = false;
 	        $(this).append( KingsGame.renderer.domElement );
 
-	        KingsGame.gameobjects = {
-	            "player" : new KingsGame.Player({
-	                modelPath: './assets/models/car/',
-	                fileName: 'car',
-	                useMTL: true,
-	                position: new THREE.Vector3(0,0,0),
-	                rotation: new THREE.Vector3(90,180,0),
-	                scale: new THREE.Vector3(1,1,1),
-	                weight: 4
-	            })
-	        };
+	        KingsGame.prototype.initGameObjects();
 
 	        window.addEventListener( 'resize', KingsGame.prototype.onWindowResize, false );
 	        document.addEventListener( 'keydown', KingsGame.prototype.onKeyDown, false );
@@ -68955,6 +69076,313 @@
 			if ( mapping !== undefined ) texture.mapping = mapping;
 
 			return texture;
+
+		}
+
+	};
+
+
+/***/ },
+/* 8 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author mrdoob / http://mrdoob.com/
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.GeometryUtils = {
+
+		// Merge two geometries or geometry and geometry from object (using object's transform)
+
+		merge: function ( geometry1, geometry2, materialIndexOffset ) {
+
+			console.warn( 'THREE.GeometryUtils: .merge() has been moved to Geometry. Use geometry.merge( geometry2, matrix, materialIndexOffset ) instead.' );
+
+			var matrix;
+
+			if ( geometry2 instanceof THREE.Mesh ) {
+
+				geometry2.matrixAutoUpdate && geometry2.updateMatrix();
+
+				matrix = geometry2.matrix;
+				geometry2 = geometry2.geometry;
+
+			}
+
+			geometry1.merge( geometry2, matrix, materialIndexOffset );
+
+		},
+
+		// Get random point in triangle (via barycentric coordinates)
+		// 	(uniform distribution)
+		// 	http://www.cgafaq.info/wiki/Random_Point_In_Triangle
+
+		randomPointInTriangle: function () {
+
+			var vector = new THREE.Vector3();
+
+			return function ( vectorA, vectorB, vectorC ) {
+
+				var point = new THREE.Vector3();
+
+				var a = Math.random();
+				var b = Math.random();
+
+				if ( ( a + b ) > 1 ) {
+
+					a = 1 - a;
+					b = 1 - b;
+
+				}
+
+				var c = 1 - a - b;
+
+				point.copy( vectorA );
+				point.multiplyScalar( a );
+
+				vector.copy( vectorB );
+				vector.multiplyScalar( b );
+
+				point.add( vector );
+
+				vector.copy( vectorC );
+				vector.multiplyScalar( c );
+
+				point.add( vector );
+
+				return point;
+
+			};
+
+		}(),
+
+		// Get random point in face (triangle)
+		// (uniform distribution)
+
+		randomPointInFace: function ( face, geometry ) {
+
+			var vA, vB, vC;
+
+			vA = geometry.vertices[ face.a ];
+			vB = geometry.vertices[ face.b ];
+			vC = geometry.vertices[ face.c ];
+
+			return THREE.GeometryUtils.randomPointInTriangle( vA, vB, vC );
+
+		},
+
+		// Get uniformly distributed random points in mesh
+		// 	- create array with cumulative sums of face areas
+		//  - pick random number from 0 to total area
+		//  - find corresponding place in area array by binary search
+		//	- get random point in face
+
+		randomPointsInGeometry: function ( geometry, n ) {
+
+			var face, i,
+				faces = geometry.faces,
+				vertices = geometry.vertices,
+				il = faces.length,
+				totalArea = 0,
+				cumulativeAreas = [],
+				vA, vB, vC;
+
+			// precompute face areas
+
+			for ( i = 0; i < il; i ++ ) {
+
+				face = faces[ i ];
+
+				vA = vertices[ face.a ];
+				vB = vertices[ face.b ];
+				vC = vertices[ face.c ];
+
+				face._area = THREE.GeometryUtils.triangleArea( vA, vB, vC );
+
+				totalArea += face._area;
+
+				cumulativeAreas[ i ] = totalArea;
+
+			}
+
+			// binary search cumulative areas array
+
+			function binarySearchIndices( value ) {
+
+				function binarySearch( start, end ) {
+
+					// return closest larger index
+					// if exact number is not found
+
+					if ( end < start )
+						return start;
+
+					var mid = start + Math.floor( ( end - start ) / 2 );
+
+					if ( cumulativeAreas[ mid ] > value ) {
+
+						return binarySearch( start, mid - 1 );
+
+					} else if ( cumulativeAreas[ mid ] < value ) {
+
+						return binarySearch( mid + 1, end );
+
+					} else {
+
+						return mid;
+
+					}
+
+				}
+
+				var result = binarySearch( 0, cumulativeAreas.length - 1 );
+				return result;
+
+			}
+
+			// pick random face weighted by face area
+
+			var r, index,
+				result = [];
+
+			var stats = {};
+
+			for ( i = 0; i < n; i ++ ) {
+
+				r = Math.random() * totalArea;
+
+				index = binarySearchIndices( r );
+
+				result[ i ] = THREE.GeometryUtils.randomPointInFace( faces[ index ], geometry );
+
+				if ( ! stats[ index ] ) {
+
+					stats[ index ] = 1;
+
+				} else {
+
+					stats[ index ] += 1;
+
+				}
+
+			}
+
+			return result;
+
+		},
+
+		randomPointsInBufferGeometry: function ( geometry, n ) {
+
+			var i,
+				vertices = geometry.attributes.position.array,
+				totalArea = 0,
+				cumulativeAreas = [],
+				vA, vB, vC;
+
+			// precompute face areas
+			vA = new THREE.Vector3();
+			vB = new THREE.Vector3();
+			vC = new THREE.Vector3();
+
+			// geometry._areas = [];
+			var il = vertices.length / 9;
+
+			for ( i = 0; i < il; i ++ ) {
+
+				vA.set( vertices[ i * 9 + 0 ], vertices[ i * 9 + 1 ], vertices[ i * 9 + 2 ] );
+				vB.set( vertices[ i * 9 + 3 ], vertices[ i * 9 + 4 ], vertices[ i * 9 + 5 ] );
+				vC.set( vertices[ i * 9 + 6 ], vertices[ i * 9 + 7 ], vertices[ i * 9 + 8 ] );
+
+				area = THREE.GeometryUtils.triangleArea( vA, vB, vC );
+				totalArea += area;
+
+				cumulativeAreas.push( totalArea );
+
+			}
+
+			// binary search cumulative areas array
+
+			function binarySearchIndices( value ) {
+
+				function binarySearch( start, end ) {
+
+					// return closest larger index
+					// if exact number is not found
+
+					if ( end < start )
+						return start;
+
+					var mid = start + Math.floor( ( end - start ) / 2 );
+
+					if ( cumulativeAreas[ mid ] > value ) {
+
+						return binarySearch( start, mid - 1 );
+
+					} else if ( cumulativeAreas[ mid ] < value ) {
+
+						return binarySearch( mid + 1, end );
+
+					} else {
+
+						return mid;
+
+					}
+
+				}
+
+				var result = binarySearch( 0, cumulativeAreas.length - 1 );
+				return result;
+
+			}
+
+			// pick random face weighted by face area
+
+			var r, index,
+				result = [];
+
+			for ( i = 0; i < n; i ++ ) {
+
+				r = Math.random() * totalArea;
+
+				index = binarySearchIndices( r );
+
+				// result[ i ] = THREE.GeometryUtils.randomPointInFace( faces[ index ], geometry, true );
+				vA.set( vertices[ index * 9 + 0 ], vertices[ index * 9 + 1 ], vertices[ index * 9 + 2 ] );
+				vB.set( vertices[ index * 9 + 3 ], vertices[ index * 9 + 4 ], vertices[ index * 9 + 5 ] );
+				vC.set( vertices[ index * 9 + 6 ], vertices[ index * 9 + 7 ], vertices[ index * 9 + 8 ] );
+				result[ i ] = THREE.GeometryUtils.randomPointInTriangle( vA, vB, vC );
+
+			}
+
+			return result;
+
+		},
+
+		// Get triangle area (half of parallelogram)
+		// http://mathworld.wolfram.com/TriangleArea.html
+
+		triangleArea: function () {
+
+			var vector1 = new THREE.Vector3();
+			var vector2 = new THREE.Vector3();
+
+			return function ( vectorA, vectorB, vectorC ) {
+
+				vector1.subVectors( vectorB, vectorA );
+				vector2.subVectors( vectorC, vectorA );
+				vector1.cross( vector2 );
+
+				return 0.5 * vector1.length();
+
+			};
+
+		}(),
+
+		center: function ( geometry ) {
+
+			console.warn( 'THREE.GeometryUtils: .center() has been moved to Geometry. Use geometry.center() instead.' );
+			return geometry.center();
 
 		}
 
