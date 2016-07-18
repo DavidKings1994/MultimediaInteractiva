@@ -90,7 +90,7 @@
             this.model.receiveShadow = true;
             this.update();
             if(this.soundPath != "") {
-                this.bindSound('./assets/sounds/running_hell.mp3');
+                this.bindSound(this.soundPath);
             }
             KingsGame.scene.add( this.model );
         },
@@ -121,7 +121,6 @@
 			mtlLoader.load( file+'.mtl', function( materials ) {
 				materials.preload();
                 var objLoader = new THREE.OBJLoader();
-                console.log(objLoader);
                 objLoader.setPath( path );
                 objLoader.setMaterials( materials );
                 objLoader.load( file+'.obj', function ( object ) {
@@ -161,6 +160,12 @@
     KingsGame.Player = function(parameters) {
         KingsGame.GameObject.apply(this, arguments);
 
+        this.STATES = {
+            "iddle" : 0,
+            "turningRight" : 1,
+            "turningLeft" : 2,
+        };
+        this.state = this.STATES.iddle;
         this.mass = parameters.weight || 1;
         this.maxSteerVal = Math.PI / 8;
         this.maxSpeed = 5;
@@ -242,34 +247,24 @@
                 this.model.children[i].name == "Front_Wheel_Force_1_R_Front_Wheel_Force.001" ||
                 this.model.children[i].name == "Back_Wheel_Force_1_R_Back_Wheel_Force.001" ||
                 this.model.children[i].name == "Back_Wheel_Force_1_L_Back_Wheel_Force"
-            ) {
+            ){
                 this.model.children[i].visible = false;
             }
             if(this.model.children[i].name == "Front_Steering_Mesh_2_R_Cube.004") { //front right wheel
                 this.model.children[i].geometry.center();
-                this.model.children[i].geometry.translate(1.3,0.6,-2.55);
+                this.model.children[i].position.set(1.3,0.6,-2.55);
                 this.model.children[i].geometry.rotateX(-this.vehicle.getWheelSpeed(0)*(Math.PI/180));
                 this.model.children[i].rotation.set(this.vehicle.getWheelSpeed(0)*(Math.PI/180),0,0);
-                this.model.children[i].updateMatrix();
-                this.model.children[i].geometry.applyMatrix( this.model.children[i].matrix );
-                this.model.children[i].geometry.center();
-                this.model.children[i].geometry.translate(1.3,0.6,-2.55);
-                this.model.children[i].geometry.rotateY(-this.turning*(Math.PI/180));
-                this.model.children[i].rotation.set(0,this.turning*(Math.PI/180),0);
-                this.model.children[i].updateMatrix();
+                this.model.children[i].rotateOnAxis(new THREE.Vector3(0,1,0),-this.turning*(Math.PI/180));
+                this.model.children[i].rotation.set(0,-this.turning*(Math.PI/180),0);
             }
             if(this.model.children[i].name == "Front_Wheel_Mesh_2_L_Cube.009") { //front left wheel
                 this.model.children[i].geometry.center();
-                this.model.children[i].geometry.translate(-1.3,0.6,-2.55);
+                this.model.children[i].position.set(-1.3,0.6,-2.55);
                 this.model.children[i].geometry.rotateX(this.vehicle.getWheelSpeed(1)*(Math.PI/180));
                 this.model.children[i].rotation.set(-this.vehicle.getWheelSpeed(1)*(Math.PI/180),0,0);
-                this.model.children[i].updateMatrix();
-                this.model.children[i].geometry.applyMatrix( this.model.children[i].matrix );
-                this.model.children[i].geometry.center();
-                this.model.children[i].geometry.translate(-1.3,0.6,-2.55);
-                this.model.children[i].geometry.rotateY(-this.turning*(Math.PI/180));
-                this.model.children[i].rotation.set(0,this.turning*(Math.PI/180),0);
-                this.model.children[i].updateMatrix();
+                this.model.children[i].rotateOnAxis(new THREE.Vector3(0,1,0),-this.turning*(Math.PI/180));
+                this.model.children[i].rotation.set(0,-this.turning*(Math.PI/180),0);
             }
             if(this.model.children[i].name == "Back_Wheel_Mesh_1_R_Cube.003") { //back right wheel
                 this.model.children[i].geometry.center();
@@ -284,7 +279,27 @@
                 this.model.children[i].rotation.set(-this.vehicle.getWheelSpeed(3)*(Math.PI/180),0,0);
             }
         }
-        this.turning = 0;
+        switch (this.state) {
+        case this.STATES.iddle:
+            if(this.turning < 0) {
+                this.turning+=5;
+            }
+            if(this.turning > 0) {
+                this.turning-=5;
+            }
+            break;
+        case this.STATES.turningRight:
+            if(this.turning < 45) {
+                this.turning+=5;
+            }
+            break;
+        case this.STATES.turningLeft:
+            if(this.turning > -45) {
+                this.turning-=5;
+            }
+            break;
+        }
+        console.log(this.state);
     };
 
     KingsGame.Player.prototype.getDirection = function() {
@@ -427,19 +442,12 @@
         case 39: // right
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 1);
-            if(KingsGame.gameobjects.player.turning < 45) {
-                KingsGame.gameobjects.player.turning++;
-            }
             break;
 
         case 37: // left
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 1);
-            if(KingsGame.gameobjects.player.turning > -45) {
-                KingsGame.gameobjects.player.turning--;
-            }
             break;
-
         }
     };
 
@@ -454,11 +462,25 @@
         case 50: // third person: 2
             KingsGame.firstPerson = false;
             break;
+
+        case 39: // right
+            KingsGame.gameobjects.player.state = KingsGame.gameobjects.player.STATES.turningRight;
+            break;
+
+        case 37: // left
+            KingsGame.gameobjects.player.state = KingsGame.gameobjects.player.STATES.turningLeft;
+            break;
         }
     };
 
     KingsGame.prototype.onKeyUp = function( event ) {
         KingsGame.prototype.keyHandler( event );
+        switch(event.keyCode){
+        case 39: // right
+        case 37: // left
+            KingsGame.gameobjects.player.state = KingsGame.gameobjects.player.STATES.iddle;
+            break;
+        }
     };
 
     KingsGame.prototype.bindSoundToMesh = function(mesh, soundPath) {
@@ -545,7 +567,7 @@
                 position: new THREE.Vector3(0,20,2),
                 scale: new THREE.Vector3(1,1,1),
                 weight: 4,
-                soundPath: './assets/sounds/running_hell.mp3'
+                //soundPath: './assets/sounds/running_hell.mp3'
             }),
         };
     };
