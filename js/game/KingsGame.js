@@ -1,13 +1,13 @@
 (function(root, factory) {
     'use strict';
     if (typeof define === 'function' && define.amd) {
-        define(['jquery','three','underscore','cannon'], factory);
+        define(['jquery','three','underscore','cannon','Backbone'], factory);
     } else if (typeof exports !== 'undefined') {
-        module.exports = factory(require('jquery','three','underscore','cannon'));
+        module.exports = factory(require('jquery','three','underscore','cannon','Backbone'));
     } else {
-        root.myModule = factory(root.jquery, root.three, root.underscore, root.cannon);
+        root.myModule = factory(root.jquery, root.three, root.underscore, root.cannon, root.Backbone);
     }
-}(this, function($, THREE, _, CANNON) {
+}(this, function($, THREE, _, CANNON, Backbone) {
     'use strict';
 
     var KingsGame = window.KingsGame || {};
@@ -16,6 +16,9 @@
     require('./../../node_modules/three/examples/js/loaders/OBJLoader.js');
     require('./../../node_modules/three/examples/js/loaders/MTLLoader.js');
     require('./../../node_modules/three/examples/js/utils/GeometryUtils.js');
+    require('./../../node_modules/three/examples/js/Detector.js');
+    var LoadingScreen = require( __dirname + '/../views/loadingScreen.js');
+    var Stats = require('./../../node_modules/three/examples/js/libs/stats.min.js');
 
     var KingsGame = ( function() {
         function KingsGame() {
@@ -58,10 +61,6 @@
             KingsGame.world.addContactMaterial(mat_ground);
         }
         this.body.addShape(shape);
-        //this.body.angularVelocity.set(0,3,0);
-        //this.body.velocity.x = 5;
-        //this.body.angularDamping = 0.5;
-        //this.body.linearDamping = 0.5;
         KingsGame.world.addBody( this.body );
     };
 
@@ -83,54 +82,48 @@
             }
         },
 
-        onProgress: function ( xhr ) {
-            if ( xhr.lengthComputable ) {
-                var percentComplete = xhr.loaded / xhr.total * 100;
-                console.log( Math.round(percentComplete, 2) + '% downloaded' );
-            }
-        },
-
-        onError: function ( xhr ) {
-            console.log("failed");
-        },
-
         initModel(object) {
             this.model = object;
             this.model.castShadow = true;
             this.model.receiveShadow = true;
-            this.update();
             if(this.soundPath != "") {
                 this.bindSound(this.soundPath);
             }
             KingsGame.scene.add( this.model );
+            this.update();
         },
 
         loadObj: function(path, file) {
             var self = this;
-            var objLoader = new THREE.OBJLoader();
+            var objLoader = new THREE.OBJLoader(KingsGame.manager);
             objLoader.setPath( path );
             objLoader.load( file+'.obj', function ( object ) {
                 object.name = file;
                 object.traverse( function (child) {
                     if ( child instanceof THREE.Mesh ) {
-                        child.material = new THREE.MeshPhongMaterial({
-                            map: THREE.ImageUtils.loadTexture( path+file+'.jpg' )
-                        });
+                        var textureLoader = new THREE.TextureLoader(KingsGame.manager);
+                        textureLoader.load( path+file+'.jpg',
+                        	function ( texture ) {
+                        		child.material = new THREE.MeshPhongMaterial({
+                        			map: texture
+                        		});
+                        	}
+                        );
                         child.castShadow = true;
                         child.receiveShadow = true;
                     }
                 });
                 self.initModel(object);
-            }, self.onProgress, self.onError );
+            });
         },
 
         loadObjMtl: function(path, file) {
             var self = this;
-            var mtlLoader = new THREE.MTLLoader();
+            var mtlLoader = new THREE.MTLLoader(KingsGame.manager);
 			mtlLoader.setPath( path );
 			mtlLoader.load( file+'.mtl', function( materials ) {
 				materials.preload();
-                var objLoader = new THREE.OBJLoader();
+                var objLoader = new THREE.OBJLoader(KingsGame.manager);
                 objLoader.setPath( path );
                 objLoader.setMaterials( materials );
                 objLoader.load( file+'.obj', function ( object ) {
@@ -142,20 +135,12 @@
                         }
                     });
                     self.initModel(object);
-                }, self.onProgress, self.onError );
-            });
-        },
-
-        get Model() {
-            return this.model;
-        },
-
-        set Model(model) {
-            this.model = model;
+                });
+            },this.onProgress);
         },
 
         bindSound: function(soundPath) {
-            var audioLoader = new THREE.AudioLoader();
+            var audioLoader = new THREE.AudioLoader( KingsGame.manager );
             var sound = new THREE.PositionalAudio( KingsGame.listener );
     		audioLoader.load( soundPath, function( buffer ) {
     			sound.setBuffer( buffer );
@@ -238,9 +223,15 @@
             direction: down
         });
 
+        if(parameters.colideEvent != null) {
+            this.body.addEventListener("collide",parameters.colideEvent);
+        }
         for(var i=0; i<this.vehicle.wheelBodies.length; i++){
             this.vehicle.wheelBodies[i].angularDamping = 0.4;
             this.vehicle.wheelBodies[i].name = "wheel";
+            if(parameters.colideEvent != null) {
+                this.vehicle.wheelBodies[i].addEventListener("collide",parameters.colideEvent);
+            }
         }
 
         this.vehicle.addToWorld(KingsGame.world);
@@ -332,11 +323,16 @@
         return temp;
     };
 
+    KingsGame.RoadSection = function(parameters) {
+
+    };
+
     KingsGame.prototype.updatePhysics = function () {
         KingsGame.world.step( KingsGame.timeStep );
     };
 
     KingsGame.prototype.update = function () {
+        KingsGame.stats.update();
         KingsGame.prototype.updatePhysics();
         var elements = _.toArray(KingsGame.gameobjects);
         for (var i = 0; i < elements.length; i++) {
@@ -349,6 +345,9 @@
             KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
             fixedVec.add(KingsGame.gameobjects.player.getDirection());
             KingsGame.camera.lookAt(fixedVec);
+            var up = new THREE.Vector3(0,1,0);
+            up.applyQuaternion(KingsGame.gameobjects.player.model.quaternion);
+            KingsGame.camera.up.copy(up);
         } else {
             var fixedVec = new THREE.Vector3(0,0,3);
             fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
@@ -356,10 +355,11 @@
             fixedVec.add(KingsGame.gameobjects.player.getDirection().negate());
             KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
             KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+            KingsGame.camera.up.set(0,0,1);
         }
         KingsGame.dirLight.position.set(
             KingsGame.gameobjects.player.position.x,
-            KingsGame.gameobjects.player.position.y,
+            KingsGame.gameobjects.player.position.y - 5,
             KingsGame.gameobjects.player.position.z + 20
         );
         KingsGame.dirLight.target.position.copy(KingsGame.gameobjects.player.position);
@@ -372,6 +372,9 @@
             KingsGame.prototype.update();
         }
         KingsGame.renderer.clear();
+        if(KingsGame.ready) {
+            Backbone.trigger( 'done', KingsGame.ready );
+        }
         KingsGame.renderer.render(KingsGame.scene, KingsGame.camera);
     };
 
@@ -381,15 +384,12 @@
             var element = document.body;
             var pointerlockchange = function ( event ) {
                 if ( document.pointerLockElement === element || document.mozPointerLockElement === element || document.webkitPointerLockElement === element ) {
-                    //controlsEnabled = true;
-                    //controls.enabled = true;
                     blocker.style.display = 'none';
                     scoreContainer.style.display = "box";
                     scoreContainer.style.display = '-webkit-box';
                     scoreContainer.style.display = '-moz-box';
                     KingsGame.paused = false;
                 } else {
-                    //controls.enabled = false;
                     blocker.style.display = '-webkit-box';
                     blocker.style.display = '-moz-box';
                     blocker.style.display = 'box';
@@ -452,21 +452,22 @@
 
         switch(event.keyCode){
 
+        case 87: // w
         case 38: // forward
             KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : KingsGame.gameobjects.player.maxForce, 2);
             KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : -KingsGame.gameobjects.player.maxForce, 3);
             break;
-
+        case 83: // s
         case 40: // backward
             KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : -KingsGame.gameobjects.player.maxForce/2, 2);
             KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : KingsGame.gameobjects.player.maxForce/2, 3);
             break;
-
+        case 68: // d
         case 39: // right
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 1);
             break;
-
+        case 65: // a
         case 37: // left
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 1);
@@ -487,11 +488,15 @@
             break;
 
         case 39: // right
+        case 68: // d
             KingsGame.gameobjects.player.state = KingsGame.gameobjects.player.STATES.turningRight;
+            //KingsGame.gameobjects.player.body.angularVelocity.set(0,0,1);
             break;
 
         case 37: // left
+        case 65: // a
             KingsGame.gameobjects.player.state = KingsGame.gameobjects.player.STATES.turningLeft;
+            //KingsGame.gameobjects.player.body.angularVelocity.set(0,0,-1);
             break;
         }
     };
@@ -501,7 +506,10 @@
         switch(event.keyCode){
         case 39: // right
         case 37: // left
+        case 68: // d
+        case 65: // a
             KingsGame.gameobjects.player.state = KingsGame.gameobjects.player.STATES.iddle;
+            //KingsGame.gameobjects.player.body.angularVelocity.set(0,0,0);
             break;
         }
     };
@@ -516,6 +524,22 @@
 		});
 		mesh.add( sound );
     };
+
+    KingsGame.prototype.initLoadManager = function() {
+        KingsGame.manager = new THREE.LoadingManager();
+        KingsGame.manager.onProgress = function(item, loaded, total) {
+            var percentComplete = loaded / total * 100;
+            percentComplete = Math.round(percentComplete, 2)
+            console.log( percentComplete + '% downloaded' );
+            Backbone.trigger('loading', percentComplete);
+        };
+        KingsGame.manager.onLoad = function() {
+            console.log("all systems go");
+        };
+        KingsGame.manager.onError = function() {
+            console.log("error on assets load");
+        };
+    }
 
     KingsGame.prototype.initGround = function() {
         THREE.crossOrigin = "";
@@ -536,10 +560,10 @@
         KingsGame.groundBody.addShape( groundShape );
         KingsGame.world.addBody( KingsGame.groundBody );
 
-        var bmap = THREE.ImageUtils.loadTexture("./assets/textures/ground_b.png");
+        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
         bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
         bmap.repeat.set( 10, 10 );
-        var smap = THREE.ImageUtils.loadTexture("./assets/textures/ground_d.jpg");
+        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
         smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
         smap.repeat.set( 10, 10 );
         var groundTexture = new THREE.MeshPhongMaterial({
@@ -554,6 +578,24 @@
         mesh.quaternion.copy( KingsGame.groundBody.quaternion );
         mesh.receiveShadow = true;
         KingsGame.scene.add( mesh );
+
+        var mat = new CANNON.Material();
+        var shape = new CANNON.Box( new CANNON.Vec3(4,10,0.1) );
+        var body = new CANNON.Body({
+            mass: 0,
+            material: mat,
+            position: new CANNON.Vec3(10,0,-7)
+        });
+        body.addShape( shape );
+        body.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), 20*(Math.PI/180));
+        KingsGame.world.addBody( body );
+
+        var mesh = new THREE.Mesh( new THREE.CubeGeometry( 8, 20, 0.2 ), groundTexture );
+        mesh.position.copy( body.position );
+        mesh.quaternion.copy( body.quaternion );
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
+        KingsGame.scene.add( mesh );
     };
 
     KingsGame.prototype.bumper = function(e){
@@ -563,6 +605,7 @@
             dir = dir.negate();
             dir.z = 0.3;
             dir = dir.scale(70);
+            KingsGame.gameobjects.player.body.angularVelocity.set(0,0,0);
             KingsGame.gameobjects.player.body.inertia.set(0,0,0);
             KingsGame.gameobjects.player.body.velocity.copy(dir);
         }
@@ -577,7 +620,10 @@
                 position: new THREE.Vector3(0,0,0),
                 rotation: new THREE.Vector3(90,180,0),
                 scale: new THREE.Vector3(1,1,1),
-                weight: 4
+                weight: 4,
+                colideEvent: function() {
+                    KingsGame.ready = true;
+                }
             }),
             "crate1" : new KingsGame.GameObject({
                 modelPath: './assets/models/crate/',
@@ -609,13 +655,20 @@
                 colideEvent: KingsGame.prototype.bumper
             }),
         };
-        console.log(KingsGame.gameobjects);
     };
 
     $.fn.initGame = function( parameters ) {
+        KingsGame.loadingScreen = new LoadingScreen();
+        KingsGame.loadingScreen.render();
+        $(document.body).append( KingsGame.loadingScreen.$el );
+
+        KingsGame.ready = false;
         KingsGame.timeStep = 1.0 / 60.0;
-        KingsGame.paused = true;
+        KingsGame.paused = false;
         KingsGame.firstPerson = false;
+        if( parameters.pointerLocked ) {
+            KingsGame.prototype.lockPointer();
+        }
 
         KingsGame.scene = new THREE.Scene();
         KingsGame.scene.fog = new THREE.Fog( 0xffffff, 1, 5000 );
@@ -630,6 +683,8 @@
         KingsGame.world.defaultContactMaterial.friction = 0.2;
 
         KingsGame.prototype.initGround();
+        KingsGame.prototype.initLoadManager();
+        KingsGame.prototype.initGameObjects();
 
         var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
         hemiLight.color.setHSL( 0.6, 1, 0.6 );
@@ -681,7 +736,7 @@
         KingsGame.listener = new THREE.AudioListener();
 		KingsGame.camera.add( KingsGame.listener );
 
-        var audioLoader = new THREE.AudioLoader();
+        var audioLoader = new THREE.AudioLoader(KingsGame.manager);
         var sound = new THREE.Audio( KingsGame.listener );
 		audioLoader.load( './assets/sounds/running_hell.mp3', function( buffer ) {
 			sound.setBuffer( buffer );
@@ -699,15 +754,13 @@
         KingsGame.renderer.autoClear = false;
         $(this).append( KingsGame.renderer.domElement );
 
-        KingsGame.prototype.initGameObjects();
+        KingsGame.stats = new Stats();
+		$(this).append( KingsGame.stats.dom );
 
         window.addEventListener( 'resize', KingsGame.prototype.onWindowResize, false );
         document.addEventListener( 'keydown', KingsGame.prototype.onKeyDown, false );
         document.addEventListener( 'keyup', KingsGame.prototype.onKeyUp, false );
         document.addEventListener( 'mousemove', KingsGame.prototype.onMouseMove, false );
-        if( parameters.pointerLocked ) {
-            KingsGame.prototype.lockPointer();
-        }
 
         KingsGame.prototype.render();
     };

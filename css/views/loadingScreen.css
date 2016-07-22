@@ -1,0 +1,17 @@
+.loadingScreen {
+    width: 100%;
+    height: 100%;
+    background: black;
+    position: fixed;
+    top: 0;
+    z-index: 1;
+}
+
+.loadingScreen .progress {
+    width: 70%;
+    margin: 0 auto;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+}
