@@ -191,24 +191,6 @@
         wheelBody.addShape(wheelShape);
         this.vehicle.addWheel({
             body: wheelBody,
-            position: new CANNON.Vec3(axisWidth/2, 4, 0),
-            axis: new CANNON.Vec3(1, 0, 0),
-            direction: down
-        });
-
-        var wheelBody = new CANNON.Body({ mass: this.mass, material: wheelMaterial });
-        wheelBody.addShape(wheelShape);
-        this.vehicle.addWheel({
-            body: wheelBody,
-            position: new CANNON.Vec3(-axisWidth/2, 4, 0),
-            axis: new CANNON.Vec3(-1, 0, 0),
-            direction: down
-        });
-
-        var wheelBody = new CANNON.Body({ mass: this.mass, material: wheelMaterial });
-        wheelBody.addShape(wheelShape);
-        this.vehicle.addWheel({
-            body: wheelBody,
             position: new CANNON.Vec3(axisWidth/2, -4, 0),
             axis: new CANNON.Vec3(1, 0, 0),
             direction: down
@@ -219,6 +201,24 @@
         this.vehicle.addWheel({
             body: wheelBody,
             position: new CANNON.Vec3(-axisWidth/2, -4, 0),
+            axis: new CANNON.Vec3(-1, 0, 0),
+            direction: down
+        });
+
+        var wheelBody = new CANNON.Body({ mass: this.mass, material: wheelMaterial });
+        wheelBody.addShape(wheelShape);
+        this.vehicle.addWheel({
+            body: wheelBody,
+            position: new CANNON.Vec3(axisWidth/2, 4, 0),
+            axis: new CANNON.Vec3(1, 0, 0),
+            direction: down
+        });
+
+        var wheelBody = new CANNON.Body({ mass: this.mass, material: wheelMaterial });
+        wheelBody.addShape(wheelShape);
+        this.vehicle.addWheel({
+            body: wheelBody,
+            position: new CANNON.Vec3(-axisWidth/2, 4, 0),
             axis: new CANNON.Vec3(-1, 0, 0),
             direction: down
         });
@@ -283,13 +283,13 @@
             }
             if(this.model.children[i].name == "Back_Wheel_Mesh_1_L_Cube.002") { //back right wheel
                 this.model.children[i].geometry.center();
-                this.model.children[i].geometry.translate(1.7,0.6,2.2);
+                this.model.children[i].geometry.translate(-1.6,0.6,2.2);
                 this.model.children[i].geometry.rotateX(-this.vehicle.getWheelSpeed(2)*(Math.PI/180));
                 this.model.children[i].rotation.set(this.vehicle.getWheelSpeed(2)*(Math.PI/180),0,0);
             }
             if(this.model.children[i].name == "Back_Wheel_Mesh_1_R_Cube.003") { //back left wheel
                 this.model.children[i].geometry.center();
-                this.model.children[i].geometry.translate(-1.7,0.6,2.2);
+                this.model.children[i].geometry.translate(1.6,0.6,2.2);
                 this.model.children[i].geometry.rotateX(this.vehicle.getWheelSpeed(3)*(Math.PI/180));
                 this.model.children[i].rotation.set(-this.vehicle.getWheelSpeed(3)*(Math.PI/180),0,0);
             }
@@ -304,12 +304,12 @@
             }
             break;
         case this.STATES.turningRight:
-            if(this.turning < 45) {
+            if(this.turning < 35) {
                 this.turning+=5;
             }
             break;
         case this.STATES.turningLeft:
-            if(this.turning > -45) {
+            if(this.turning > -35) {
                 this.turning-=5;
             }
             break;
@@ -338,24 +338,38 @@
         for (var i = 0; i < elements.length; i++) {
             elements[i].update();
         }
-        if(KingsGame.firstPerson) {
-            var fixedVec = new THREE.Vector3(0,-1.5,1.5);
-            fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
-            fixedVec.add(KingsGame.gameobjects.player.position);
-            KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
-            fixedVec.add(KingsGame.gameobjects.player.getDirection());
-            KingsGame.camera.lookAt(fixedVec);
-            var up = new THREE.Vector3(0,1,0);
-            up.applyQuaternion(KingsGame.gameobjects.player.model.quaternion);
-            KingsGame.camera.up.copy(up);
-        } else {
-            var fixedVec = new THREE.Vector3(0,0,3);
-            fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
-            fixedVec.add(KingsGame.gameobjects.player.position);
-            fixedVec.add(KingsGame.gameobjects.player.getDirection().negate());
-            KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
-            KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
-            KingsGame.camera.up.set(0,0,1);
+        switch (KingsGame.camera.type) {
+            case KingsGame.CAMERA_TYPES.firstPerson:
+                var fixedVec = new THREE.Vector3(0,-1.5,1.5);
+                fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
+                fixedVec.add(KingsGame.gameobjects.player.position);
+                KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
+                fixedVec.add(KingsGame.gameobjects.player.getDirection());
+                KingsGame.camera.lookAt(fixedVec);
+                var up = new THREE.Vector3(0,1,0);
+                up.applyQuaternion(KingsGame.gameobjects.player.model.quaternion);
+                KingsGame.camera.up.copy(up);
+                break;
+            case KingsGame.CAMERA_TYPES.thirdPerson:
+                var fixedVec = new THREE.Vector3(0,0,3);
+                fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
+                fixedVec.add(KingsGame.gameobjects.player.position);
+                fixedVec.add(KingsGame.gameobjects.player.getDirection().negate());
+                KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
+                KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+                KingsGame.camera.up.set(0,0,1);
+                break;
+            case KingsGame.CAMERA_TYPES.upView:
+                var fixedVec = KingsGame.gameobjects.player.position.clone();
+                fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
+                KingsGame.camera.position.set(
+                    KingsGame.gameobjects.player.position.x,
+                    KingsGame.gameobjects.player.position.y,
+                    KingsGame.gameobjects.player.position.z + 30
+                );
+                KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+                KingsGame.camera.up.set(0,0,1);
+                break;
         }
         KingsGame.dirLight.position.set(
             KingsGame.gameobjects.player.position.x,
@@ -373,7 +387,7 @@
         }
         KingsGame.renderer.clear();
         if(KingsGame.ready) {
-            Backbone.trigger( 'done', KingsGame.ready );
+            Backbone.trigger( 'done' );
         }
         KingsGame.renderer.render(KingsGame.scene, KingsGame.camera);
     };
@@ -462,13 +476,13 @@
             KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : -KingsGame.gameobjects.player.maxForce/2, 2);
             KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : KingsGame.gameobjects.player.maxForce/2, 3);
             break;
-        case 68: // d
-        case 39: // right
+        case 65: // a
+        case 37: // left
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : KingsGame.gameobjects.player.maxSteerVal, 1);
             break;
-        case 65: // a
-        case 37: // left
+        case 68: // d
+        case 39: // right
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 1);
             break;
@@ -480,11 +494,16 @@
         switch(event.keyCode){
 
         case 49: // first person: 1
-            KingsGame.firstPerson = true;
+            var elements = _.toArray(KingsGame.CAMERA_TYPES);
+            if (KingsGame.camera.type < elements.length - 1 ) {
+                KingsGame.camera.type++;
+            } else {
+                KingsGame.camera.type = 0;
+            }
+            console.log(KingsGame.camera.type);
             break;
 
         case 50: // third person: 2
-            KingsGame.firstPerson = false;
             break;
 
         case 39: // right
@@ -530,14 +549,13 @@
         KingsGame.manager.onProgress = function(item, loaded, total) {
             var percentComplete = loaded / total * 100;
             percentComplete = Math.round(percentComplete, 2)
-            console.log( percentComplete + '% downloaded' );
             Backbone.trigger('loading', percentComplete);
         };
         KingsGame.manager.onLoad = function() {
-            console.log("all systems go");
+
         };
         KingsGame.manager.onError = function() {
-            console.log("error on assets load");
+
         };
     }
 
@@ -728,10 +746,16 @@
         var sky = new THREE.Mesh( skyGeo, skyMat );
         KingsGame.scene.add( sky );
 
+        KingsGame.CAMERA_TYPES = {
+            "firstPerson" : 0,
+            "thirdPerson" : 1,
+            "upView" : 2,
+        };
         KingsGame.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
         KingsGame.camera.position.set(0,5,0);
         KingsGame.camera.up = new THREE.Vector3(0,0,1);
         KingsGame.camera.lookAt(new THREE.Vector3(0,0,0));
+        KingsGame.camera.type = KingsGame.CAMERA_TYPES.thirdPerson;
 
         KingsGame.listener = new THREE.AudioListener();
 		KingsGame.camera.add( KingsGame.listener );
