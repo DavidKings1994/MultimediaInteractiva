@@ -34,7 +34,7 @@
         <div id="instructions">
 			<span>Click to play</span>
 			<br />
-			(W, A, S, D = Move, MOUSE = Look around)
+			(W, A, S, D = Move, 1 = change camera)
 		</div>
     </div>
     <div id="scoreContainer">

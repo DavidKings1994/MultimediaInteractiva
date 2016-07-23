@@ -57,7 +57,7 @@
             this.body.addEventListener("collide",parameters.colideEvent);
         }
         if(this.bounciness > 0) {
-            var mat_ground = new CANNON.ContactMaterial(KingsGame.groundBody.material, mat, { friction: 0.3, restitution: this.bounciness });
+            var mat_ground = new CANNON.ContactMaterial(KingsGame.groundMaterial, mat, { friction: 0.3, restitution: this.bounciness });
             KingsGame.world.addContactMaterial(mat_ground);
         }
         this.body.addShape(shape);
@@ -324,7 +324,110 @@
     };
 
     KingsGame.RoadSection = function(parameters) {
+        this.id = parameters.id;
+        this.position = parameters.position || new CANNON.Vec3();
+        this.size = parameters.size || new CANNON.Vec3(50,50,0.05);
+        this.HAZARDS = {
+            "plain": 0
+        };
+        this.hazard = parameters.hazard || this.HAZARDS.plain;
+        this.DIFICULTY = {
+            "easy": 0,
+            "medium": 0,
+            "hard": 0
+        };
+        this.dificulty = parameters.dificulty || this.DIFICULTY.easy;
 
+        this.groundBody = new CANNON.Body({
+            mass: 0,
+            position: this.position,
+            material: KingsGame.groundMaterial
+        });
+        var groundShape = new CANNON.Box( this.size );
+        this.groundBody.addShape( groundShape );
+        KingsGame.world.addBody( this.groundBody );
+
+        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
+        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
+        bmap.repeat.set( 10, 10 );
+        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
+        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
+        smap.repeat.set( 10, 10 );
+        var groundTexture = new THREE.MeshPhongMaterial({
+            shininess  :  0,
+            bumpMap    :  bmap,
+            map        :  smap,
+            bumpScale  :  0.45,
+        });
+        var geometry = new THREE.PlaneGeometry( this.size.x * 2, this.size.y * 2 );
+        this.mesh = new THREE.Mesh( geometry, groundTexture );
+        this.mesh.position.copy( this.groundBody.position );
+        this.mesh.quaternion.copy( this.groundBody.quaternion );
+        this.mesh.receiveShadow = true;
+        KingsGame.scene.add( this.mesh );
+    };
+
+    KingsGame.RoadSection.prototype = {
+        constructor: KingsGame.RoadSection,
+
+        update: function() {
+
+        },
+    };
+
+    KingsGame.Road = function() {
+        this.road = [];
+        for (var i = 0; i < 4; i++) {
+            this.road.push(new KingsGame.RoadSection({
+                id: i,
+                position: new CANNON.Vec3( 0, i * -100, -10 )
+            }));
+        }
+    };
+
+    KingsGame.Road.prototype = {
+        constructor: KingsGame.Road,
+
+        update: function() {
+            var index = this.locatePlayer();
+            if(index > this.road.length - 3) {
+                console.log(this.road);
+                this.road.push(new KingsGame.RoadSection({
+                    id: this.road[3].id + 1,
+                    position: new CANNON.Vec3( 0, (this.road[3].id + 1) * -100, -10 )
+                }));
+                KingsGame.scene.remove( this.road[0].mesh );
+                KingsGame.world.removeBody ( this.road[0].groundBody );
+                this.road.splice(0,1);
+                console.log(this.road);
+            }
+            for (var i = 0; i < this.road.length; i++) {
+                this.road[i].update();
+            }
+        },
+
+        locatePlayer: function() {
+            for (var i = 0; i < this.road.length; i++) {
+                if(
+                    (
+                        KingsGame.gameobjects.player.position.x > (this.road[i].position.x - this.road[i].size.x) &&
+                        KingsGame.gameobjects.player.position.x < (this.road[i].position.x + this.road[i].size.x)
+                    ) && (
+                        KingsGame.gameobjects.player.position.y > (this.road[i].position.y - this.road[i].size.y) &&
+                        KingsGame.gameobjects.player.position.y < (this.road[i].position.y + this.road[i].size.y)
+                    )
+                ) {
+                    return i;
+                }
+            }
+        },
+
+        insideRoad(position) {
+            if((position.x > -50 && position.x < 50) && (position.z > -15)) {
+                return true;
+            }
+            return false;
+        },
     };
 
     KingsGame.prototype.updatePhysics = function () {
@@ -338,38 +441,52 @@
         for (var i = 0; i < elements.length; i++) {
             elements[i].update();
         }
-        switch (KingsGame.camera.type) {
-            case KingsGame.CAMERA_TYPES.firstPerson:
-                var fixedVec = new THREE.Vector3(0,-1.5,1.5);
-                fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
-                fixedVec.add(KingsGame.gameobjects.player.position);
-                KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
-                fixedVec.add(KingsGame.gameobjects.player.getDirection());
-                KingsGame.camera.lookAt(fixedVec);
-                var up = new THREE.Vector3(0,1,0);
-                up.applyQuaternion(KingsGame.gameobjects.player.model.quaternion);
-                KingsGame.camera.up.copy(up);
-                break;
-            case KingsGame.CAMERA_TYPES.thirdPerson:
-                var fixedVec = new THREE.Vector3(0,0,3);
-                fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
-                fixedVec.add(KingsGame.gameobjects.player.position);
-                fixedVec.add(KingsGame.gameobjects.player.getDirection().negate());
-                KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
-                KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
-                KingsGame.camera.up.set(0,0,1);
-                break;
-            case KingsGame.CAMERA_TYPES.upView:
-                var fixedVec = KingsGame.gameobjects.player.position.clone();
-                fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
-                KingsGame.camera.position.set(
-                    KingsGame.gameobjects.player.position.x,
-                    KingsGame.gameobjects.player.position.y,
-                    KingsGame.gameobjects.player.position.z + 30
-                );
-                KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
-                KingsGame.camera.up.set(0,0,1);
-                break;
+        if( KingsGame.road.insideRoad(KingsGame.gameobjects.player.position) ) {
+            KingsGame.road.update();
+            KingsGame.sky.position.set(
+                KingsGame.gameobjects.player.position.x,
+                KingsGame.gameobjects.player.position.y,
+                0
+            );
+            switch (KingsGame.camera.type) {
+                case KingsGame.CAMERA_TYPES.firstPerson: {
+                    var fixedVec = new THREE.Vector3(0,-1.5,1.5);
+                    fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
+                    fixedVec.add(KingsGame.gameobjects.player.position);
+                    KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
+                    fixedVec.add(KingsGame.gameobjects.player.getDirection());
+                    KingsGame.camera.lookAt(fixedVec);
+                    var up = new THREE.Vector3(0,1,0);
+                    up.applyQuaternion(KingsGame.gameobjects.player.model.quaternion);
+                    KingsGame.camera.up.copy(up);
+                    break;
+                }
+                case KingsGame.CAMERA_TYPES.thirdPerson: {
+                    var fixedVec = new THREE.Vector3(0,0,3);
+                    fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
+                    fixedVec.add(KingsGame.gameobjects.player.position);
+                    fixedVec.add(KingsGame.gameobjects.player.getDirection().negate());
+                    KingsGame.camera.position.set( fixedVec.x, fixedVec.y, fixedVec.z );
+                    KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+                    KingsGame.camera.up.set(0,0,1);
+                    break;
+                }
+                case KingsGame.CAMERA_TYPES.upView: {
+                    var fixedVec = KingsGame.gameobjects.player.position.clone();
+                    fixedVec.applyQuaternion(KingsGame.gameobjects.player.body.quaternion);
+                    KingsGame.camera.position.set(
+                        KingsGame.gameobjects.player.position.x,
+                        KingsGame.gameobjects.player.position.y,
+                        KingsGame.gameobjects.player.position.z + 30
+                    );
+                    KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+                    KingsGame.camera.up.set(0,0,1);
+                    break;
+                }
+            }
+        } else {
+            KingsGame.gameOver = true;
+            KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
         }
         KingsGame.dirLight.position.set(
             KingsGame.gameobjects.player.position.x,
@@ -561,22 +678,14 @@
 
     KingsGame.prototype.initGround = function() {
         THREE.crossOrigin = "";
-        var groundMaterial = new CANNON.Material("groundMaterial");
+        KingsGame.groundMaterial = new CANNON.Material("groundMaterial");
         var wheelMaterial = new CANNON.Material("wheelMaterial");
-        var wheelGroundContactMaterial = window.wheelGroundContactMaterial = new CANNON.ContactMaterial(wheelMaterial, groundMaterial, {
+        var wheelGroundContactMaterial = window.wheelGroundContactMaterial = new CANNON.ContactMaterial(wheelMaterial, KingsGame.groundMaterial, {
             friction: 0.3,
             restitution: 0,
             contactEquationStiffness: 1000
         });
         KingsGame.world.addContactMaterial(wheelGroundContactMaterial);
-        KingsGame.groundBody = new CANNON.Body({
-            mass: 0,
-            position: new CANNON.Vec3(0,0,-10),
-            material: groundMaterial
-        });
-        var groundShape = new CANNON.Plane();
-        KingsGame.groundBody.addShape( groundShape );
-        KingsGame.world.addBody( KingsGame.groundBody );
 
         var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
         bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
@@ -590,12 +699,8 @@
             map        :  smap,
             bumpScale  :  0.45,
         });
-        var geometry = new THREE.PlaneGeometry( 100, 100 );
-        var mesh = new THREE.Mesh( geometry, groundTexture );
-        mesh.position.copy( KingsGame.groundBody.position );
-        mesh.quaternion.copy( KingsGame.groundBody.quaternion );
-        mesh.receiveShadow = true;
-        KingsGame.scene.add( mesh );
+
+        KingsGame.road = new KingsGame.Road();
 
         var mat = new CANNON.Material();
         var shape = new CANNON.Box( new CANNON.Vec3(4,10,0.1) );
@@ -681,6 +786,7 @@
         $(document.body).append( KingsGame.loadingScreen.$el );
 
         KingsGame.ready = false;
+        KingsGame.gameOver = false;
         KingsGame.timeStep = 1.0 / 60.0;
         KingsGame.paused = false;
         KingsGame.firstPerson = false;
@@ -743,8 +849,8 @@
 
         var skyGeo = new THREE.SphereGeometry( 400, 32, 15 );
         var skyMat = new THREE.ShaderMaterial( { vertexShader: vertexShader, fragmentShader: fragmentShader, uniforms: uniforms, side: THREE.BackSide } );
-        var sky = new THREE.Mesh( skyGeo, skyMat );
-        KingsGame.scene.add( sky );
+        KingsGame.sky = new THREE.Mesh( skyGeo, skyMat );
+        KingsGame.scene.add( KingsGame.sky );
 
         KingsGame.CAMERA_TYPES = {
             "firstPerson" : 0,
