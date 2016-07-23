@@ -10113,10 +10113,21 @@
 	    var KingsGame = window.KingsGame || {};
 	    window.THREE = THREE;
 
+	    __webpack_require__(13);
+		__webpack_require__(14);
+		__webpack_require__(15);
+
+		__webpack_require__(16);
+		__webpack_require__(17);
+		__webpack_require__(18);
+		__webpack_require__(19);
+		__webpack_require__(20);
+		__webpack_require__(21);
+
 	    __webpack_require__(7);
 	    __webpack_require__(8);
 	    __webpack_require__(9);
-	    __webpack_require__(10);
+	    var Detector = __webpack_require__(10);
 	    var LoadingScreen = __webpack_require__( 11);
 	    var Stats = __webpack_require__(12);
 
@@ -10426,7 +10437,7 @@
 	    KingsGame.RoadSection = function(parameters) {
 	        this.id = parameters.id;
 	        this.position = parameters.position || new CANNON.Vec3();
-	        this.size = parameters.size || new CANNON.Vec3(50,50,0.05);
+	        this.size = parameters.size || new CANNON.Vec3(25,50,0.05);
 	        this.HAZARDS = {
 	            "plain": 0
 	        };
@@ -10447,24 +10458,21 @@
 	        this.groundBody.addShape( groundShape );
 	        KingsGame.world.addBody( this.groundBody );
 
-	        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
-	        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
-	        bmap.repeat.set( 10, 10 );
-	        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
-	        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
-	        smap.repeat.set( 10, 10 );
-	        var groundTexture = new THREE.MeshPhongMaterial({
-	            shininess  :  0,
-	            bumpMap    :  bmap,
-	            map        :  smap,
-	            bumpScale  :  0.45,
-	        });
 	        var geometry = new THREE.PlaneGeometry( this.size.x * 2, this.size.y * 2 );
-	        this.mesh = new THREE.Mesh( geometry, groundTexture );
+	        this.mesh = new THREE.Mesh( geometry, KingsGame.assets.groundTexture );
 	        this.mesh.position.copy( this.groundBody.position );
 	        this.mesh.quaternion.copy( this.groundBody.quaternion );
 	        this.mesh.receiveShadow = true;
 	        KingsGame.scene.add( this.mesh );
+
+	        this.background = new THREE.Mesh( new THREE.PlaneGeometry( 400, this.size.y * 2 ), KingsGame.assets.lavaMaterial );
+	        this.background.position.set(
+	            this.groundBody.position.x,
+	            this.groundBody.position.y,
+	            this.groundBody.position.z - 5
+	        );
+	        this.background.receiveShadow = true;
+	        KingsGame.scene.add( this.background );
 	    };
 
 	    KingsGame.RoadSection.prototype = {
@@ -10491,15 +10499,14 @@
 	        update: function() {
 	            var index = this.locatePlayer();
 	            if(index > this.road.length - 3) {
-	                console.log(this.road);
 	                this.road.push(new KingsGame.RoadSection({
 	                    id: this.road[3].id + 1,
 	                    position: new CANNON.Vec3( 0, (this.road[3].id + 1) * -100, -10 )
 	                }));
+	                KingsGame.scene.remove( this.road[0].background );
 	                KingsGame.scene.remove( this.road[0].mesh );
 	                KingsGame.world.removeBody ( this.road[0].groundBody );
 	                this.road.splice(0,1);
-	                console.log(this.road);
 	            }
 	            for (var i = 0; i < this.road.length; i++) {
 	                this.road[i].update();
@@ -10542,6 +10549,8 @@
 	            elements[i].update();
 	        }
 	        if( KingsGame.road.insideRoad(KingsGame.gameobjects.player.position) ) {
+	            KingsGame.score = Math.max(Math.floor((KingsGame.gameobjects.player.position.y * -1) / 10), KingsGame.score);
+	            puntuacion.innerHTML = KingsGame.score;
 	            KingsGame.road.update();
 	            KingsGame.sky.position.set(
 	                KingsGame.gameobjects.player.position.x,
@@ -10602,11 +10611,13 @@
 	        if(!KingsGame.paused) {
 	            KingsGame.prototype.update();
 	        }
-	        KingsGame.renderer.clear();
 	        if(KingsGame.ready) {
 	            Backbone.trigger( 'done' );
 	        }
-	        KingsGame.renderer.render(KingsGame.scene, KingsGame.camera);
+	        var delta = 5 * KingsGame.clock.getDelta();
+			KingsGame.assets.lavaUniforms.time.value += 0.2 * delta;
+	        KingsGame.renderer.clear();
+	        KingsGame.composer.render( delta );
 	    };
 
 	    KingsGame.prototype.lockPointer = function() {
@@ -10666,9 +10677,12 @@
 	    };
 
 	    KingsGame.prototype.onWindowResize = function() {
+	        KingsGame.assets.lavaUniforms.resolution.value.x = window.innerWidth;
+			KingsGame.assets.lavaUniforms.resolution.value.y = window.innerHeight;
 	        KingsGame.camera.aspect = window.innerWidth / window.innerHeight;
 	        KingsGame.camera.updateProjectionMatrix();
 	        KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
+	        KingsGame.composer.reset();
 	    }
 
 	    KingsGame.prototype.onMouseMove = function( event ) {
@@ -10787,19 +10801,6 @@
 	        });
 	        KingsGame.world.addContactMaterial(wheelGroundContactMaterial);
 
-	        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
-	        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
-	        bmap.repeat.set( 10, 10 );
-	        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
-	        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
-	        smap.repeat.set( 10, 10 );
-	        var groundTexture = new THREE.MeshPhongMaterial({
-	            shininess  :  0,
-	            bumpMap    :  bmap,
-	            map        :  smap,
-	            bumpScale  :  0.45,
-	        });
-
 	        KingsGame.road = new KingsGame.Road();
 
 	        var mat = new CANNON.Material();
@@ -10813,12 +10814,17 @@
 	        body.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), 20*(Math.PI/180));
 	        KingsGame.world.addBody( body );
 
-	        var mesh = new THREE.Mesh( new THREE.CubeGeometry( 8, 20, 0.2 ), groundTexture );
+	        var mesh = new THREE.Mesh( new THREE.CubeGeometry( 8, 20, 0.2 ), KingsGame.assets.groundTexture );
 	        mesh.position.copy( body.position );
 	        mesh.quaternion.copy( body.quaternion );
 	        mesh.receiveShadow = true;
 	        mesh.castShadow = true;
 	        KingsGame.scene.add( mesh );
+
+	        var ballGeometry = new THREE.SphereGeometry( 60, 64, 64 );
+	    	var ball = new THREE.Mesh(	ballGeometry,  KingsGame.assets.lavaMaterial );
+	    	ball.position.set(0, 165, 0);
+	    	KingsGame.scene.add( ball );
 	    };
 
 	    KingsGame.prototype.bumper = function(e){
@@ -10880,22 +10886,63 @@
 	        };
 	    };
 
+	    KingsGame.prototype.loadAssets = function() {
+	        KingsGame.assets = {};
+
+	        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
+	        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
+	        bmap.repeat.set( 10, 10 );
+	        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
+	        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
+	        smap.repeat.set( 10, 10 );
+	        KingsGame.assets.groundTexture = new THREE.MeshPhongMaterial({
+	            shininess  :  0,
+	            bumpMap    :  bmap,
+	            map        :  smap,
+	            bumpScale  :  0.45,
+	        });
+
+	        var textureLoader = new THREE.TextureLoader(KingsGame.manager);
+			KingsGame.assets.lavaUniforms = {
+				fogDensity: { value: 0.01 },
+				fogColor:   { value: new THREE.Vector3( 0, 0, 0 ) },
+				time:       { value: 1.0 },
+				resolution: { value: new THREE.Vector2() },
+				uvScale:    { value: new THREE.Vector2( 3.0, 1.0 ) },
+				texture1:   { value: textureLoader.load( './assets/textures/cloud.png' ) },
+				texture2:   { value: textureLoader.load( './assets/textures/lava.jpg' ) }
+			};
+
+			KingsGame.assets.lavaUniforms.texture1.value.wrapS = KingsGame.assets.lavaUniforms.texture1.value.wrapT = THREE.RepeatWrapping;
+			KingsGame.assets.lavaUniforms.texture2.value.wrapS = KingsGame.assets.lavaUniforms.texture2.value.wrapT = THREE.RepeatWrapping;
+
+	    	KingsGame.assets.lavaMaterial = new THREE.ShaderMaterial({
+	    	    uniforms: KingsGame.assets.lavaUniforms,
+	    		vertexShader:   document.getElementById( 'vertexShaderLava'   ).textContent,
+	    		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent
+	    	});
+	    };
+
 	    $.fn.initGame = function( parameters ) {
+	        if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
 	        KingsGame.loadingScreen = new LoadingScreen();
 	        KingsGame.loadingScreen.render();
 	        $(document.body).append( KingsGame.loadingScreen.$el );
 
 	        KingsGame.ready = false;
 	        KingsGame.gameOver = false;
+	        KingsGame.score = 0;
 	        KingsGame.timeStep = 1.0 / 60.0;
 	        KingsGame.paused = false;
 	        KingsGame.firstPerson = false;
+	        KingsGame.clock = new THREE.Clock();
 	        if( parameters.pointerLocked ) {
 	            KingsGame.prototype.lockPointer();
 	        }
 
 	        KingsGame.scene = new THREE.Scene();
-	        KingsGame.scene.fog = new THREE.Fog( 0xffffff, 1, 5000 );
+	        KingsGame.scene.fog = new THREE.FogExp2( 0x000000, 0.01 );
 	        KingsGame.scene.fog.color.setHSL( 0.6, 0, 1 );
 	        var ambient = new THREE.AmbientLight( 0x444444 );
 	        KingsGame.scene.add( ambient );
@@ -10906,8 +10953,9 @@
 	        KingsGame.world.solver.iterations = 10;
 	        KingsGame.world.defaultContactMaterial.friction = 0.2;
 
-	        KingsGame.prototype.initGround();
 	        KingsGame.prototype.initLoadManager();
+	        KingsGame.prototype.loadAssets();
+	        KingsGame.prototype.initGround();
 	        KingsGame.prototype.initGameObjects();
 
 	        var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
@@ -10940,7 +10988,7 @@
 	        var fragmentShader = document.getElementById( 'fragmentShader' ).textContent;
 	        var uniforms = {
 	            topColor: 	 { type: "c", value: new THREE.Color( 0x0077ff ) },
-	            bottomColor: { type: "c", value: new THREE.Color( 0xffffff ) },
+	            bottomColor: { type: "c", value: new THREE.Color( 0x000000 ) },
 	            offset:		 { type: "f", value: 33 },
 	            exponent:	 { type: "f", value: 0.6 }
 	        };
@@ -10948,7 +10996,12 @@
 	        KingsGame.scene.fog.color.copy( uniforms.bottomColor.value );
 
 	        var skyGeo = new THREE.SphereGeometry( 400, 32, 15 );
-	        var skyMat = new THREE.ShaderMaterial( { vertexShader: vertexShader, fragmentShader: fragmentShader, uniforms: uniforms, side: THREE.BackSide } );
+	        var skyMat = new THREE.ShaderMaterial({
+	            vertexShader: vertexShader,
+	            fragmentShader: fragmentShader,
+	            uniforms: uniforms,
+	            side: THREE.BackSide
+	        });
 	        KingsGame.sky = new THREE.Mesh( skyGeo, skyMat );
 	        KingsGame.scene.add( KingsGame.sky );
 
@@ -10957,7 +11010,7 @@
 	            "thirdPerson" : 1,
 	            "upView" : 2,
 	        };
-	        KingsGame.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+	        KingsGame.camera = new THREE.PerspectiveCamera( 75, (window.innerWidth/2)/(window.innerHeight/2), 0.1, 1000 );
 	        KingsGame.camera.position.set(0,5,0);
 	        KingsGame.camera.up = new THREE.Vector3(0,0,1);
 	        KingsGame.camera.lookAt(new THREE.Vector3(0,0,0));
@@ -10983,6 +11036,15 @@
 	        KingsGame.renderer.shadowMap.type = THREE.PCFShadowMap;
 	        KingsGame.renderer.autoClear = false;
 	        $(this).append( KingsGame.renderer.domElement );
+
+	        var renderModel = new THREE.RenderPass( KingsGame.scene, KingsGame.camera );
+			var effectBloom = new THREE.BloomPass( 0 );
+			var effectFilm = new THREE.FilmPass( 0, 0, 1024, false );
+			effectFilm.renderToScreen = true;
+			KingsGame.composer = new THREE.EffectComposer( KingsGame.renderer );
+			KingsGame.composer.addPass( renderModel );
+			KingsGame.composer.addPass( effectBloom );
+			KingsGame.composer.addPass( effectFilm );
 
 	        KingsGame.stats = new Stats();
 			$(this).append( KingsGame.stats.dom );
@@ -71696,6 +71758,878 @@
 	if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
 	Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
 	v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
+
+
+/***/ },
+/* 13 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 *
+	 * Convolution shader
+	 * ported from o3d sample to WebGL / GLSL
+	 * http://o3d.googlecode.com/svn/trunk/samples/convolution.html
+	 */
+
+	THREE.ConvolutionShader = {
+
+		defines: {
+
+			"KERNEL_SIZE_FLOAT": "25.0",
+			"KERNEL_SIZE_INT": "25",
+
+		},
+
+		uniforms: {
+
+			"tDiffuse":        { value: null },
+			"uImageIncrement": { value: new THREE.Vector2( 0.001953125, 0.0 ) },
+			"cKernel":         { value: [] }
+
+		},
+
+		vertexShader: [
+
+			"uniform vec2 uImageIncrement;",
+
+			"varying vec2 vUv;",
+
+			"void main() {",
+
+				"vUv = uv - ( ( KERNEL_SIZE_FLOAT - 1.0 ) / 2.0 ) * uImageIncrement;",
+				"gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
+
+			"}"
+
+		].join( "\n" ),
+
+		fragmentShader: [
+
+			"uniform float cKernel[ KERNEL_SIZE_INT ];",
+
+			"uniform sampler2D tDiffuse;",
+			"uniform vec2 uImageIncrement;",
+
+			"varying vec2 vUv;",
+
+			"void main() {",
+
+				"vec2 imageCoord = vUv;",
+				"vec4 sum = vec4( 0.0, 0.0, 0.0, 0.0 );",
+
+				"for( int i = 0; i < KERNEL_SIZE_INT; i ++ ) {",
+
+					"sum += texture2D( tDiffuse, imageCoord ) * cKernel[ i ];",
+					"imageCoord += uImageIncrement;",
+
+				"}",
+
+				"gl_FragColor = sum;",
+
+			"}"
+
+
+		].join( "\n" ),
+
+		buildKernel: function ( sigma ) {
+
+			// We lop off the sqrt(2 * pi) * sigma term, since we're going to normalize anyway.
+
+			function gauss( x, sigma ) {
+
+				return Math.exp( - ( x * x ) / ( 2.0 * sigma * sigma ) );
+
+			}
+
+			var i, values, sum, halfWidth, kMaxKernelSize = 25, kernelSize = 2 * Math.ceil( sigma * 3.0 ) + 1;
+
+			if ( kernelSize > kMaxKernelSize ) kernelSize = kMaxKernelSize;
+			halfWidth = ( kernelSize - 1 ) * 0.5;
+
+			values = new Array( kernelSize );
+			sum = 0.0;
+			for ( i = 0; i < kernelSize; ++ i ) {
+
+				values[ i ] = gauss( i - halfWidth, sigma );
+				sum += values[ i ];
+
+			}
+
+			// normalize the kernel
+
+			for ( i = 0; i < kernelSize; ++ i ) values[ i ] /= sum;
+
+			return values;
+
+		}
+
+	};
+
+
+/***/ },
+/* 14 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 *
+	 * Full-screen textured quad shader
+	 */
+
+	THREE.CopyShader = {
+
+		uniforms: {
+
+			"tDiffuse": { value: null },
+			"opacity":  { value: 1.0 }
+
+		},
+
+		vertexShader: [
+
+			"varying vec2 vUv;",
+
+			"void main() {",
+
+				"vUv = uv;",
+				"gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
+
+			"}"
+
+		].join( "\n" ),
+
+		fragmentShader: [
+
+			"uniform float opacity;",
+
+			"uniform sampler2D tDiffuse;",
+
+			"varying vec2 vUv;",
+
+			"void main() {",
+
+				"vec4 texel = texture2D( tDiffuse, vUv );",
+				"gl_FragColor = opacity * texel;",
+
+			"}"
+
+		].join( "\n" )
+
+	};
+
+
+/***/ },
+/* 15 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 *
+	 * Film grain & scanlines shader
+	 *
+	 * - ported from HLSL to WebGL / GLSL
+	 * http://www.truevision3d.com/forums/showcase/staticnoise_colorblackwhite_scanline_shaders-t18698.0.html
+	 *
+	 * Screen Space Static Postprocessor
+	 *
+	 * Produces an analogue noise overlay similar to a film grain / TV static
+	 *
+	 * Original implementation and noise algorithm
+	 * Pat 'Hawthorne' Shearon
+	 *
+	 * Optimized scanlines + noise version with intensity scaling
+	 * Georg 'Leviathan' Steinrohder
+	 *
+	 * This version is provided under a Creative Commons Attribution 3.0 License
+	 * http://creativecommons.org/licenses/by/3.0/
+	 */
+
+	THREE.FilmShader = {
+
+		uniforms: {
+
+			"tDiffuse":   { value: null },
+			"time":       { value: 0.0 },
+			"nIntensity": { value: 0.5 },
+			"sIntensity": { value: 0.05 },
+			"sCount":     { value: 4096 },
+			"grayscale":  { value: 1 }
+
+		},
+
+		vertexShader: [
+
+			"varying vec2 vUv;",
+
+			"void main() {",
+
+				"vUv = uv;",
+				"gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
+
+			"}"
+
+		].join( "\n" ),
+
+		fragmentShader: [
+
+			"#include <common>",
+			
+			// control parameter
+			"uniform float time;",
+
+			"uniform bool grayscale;",
+
+			// noise effect intensity value (0 = no effect, 1 = full effect)
+			"uniform float nIntensity;",
+
+			// scanlines effect intensity value (0 = no effect, 1 = full effect)
+			"uniform float sIntensity;",
+
+			// scanlines effect count value (0 = no effect, 4096 = full effect)
+			"uniform float sCount;",
+
+			"uniform sampler2D tDiffuse;",
+
+			"varying vec2 vUv;",
+
+			"void main() {",
+
+				// sample the source
+				"vec4 cTextureScreen = texture2D( tDiffuse, vUv );",
+
+				// make some noise
+				"float dx = rand( vUv + time );",
+
+				// add noise
+				"vec3 cResult = cTextureScreen.rgb + cTextureScreen.rgb * clamp( 0.1 + dx, 0.0, 1.0 );",
+
+				// get us a sine and cosine
+				"vec2 sc = vec2( sin( vUv.y * sCount ), cos( vUv.y * sCount ) );",
+
+				// add scanlines
+				"cResult += cTextureScreen.rgb * vec3( sc.x, sc.y, sc.x ) * sIntensity;",
+
+				// interpolate between source and result by intensity
+				"cResult = cTextureScreen.rgb + clamp( nIntensity, 0.0,1.0 ) * ( cResult - cTextureScreen.rgb );",
+
+				// convert to grayscale if desired
+				"if( grayscale ) {",
+
+					"cResult = vec3( cResult.r * 0.3 + cResult.g * 0.59 + cResult.b * 0.11 );",
+
+				"}",
+
+				"gl_FragColor =  vec4( cResult, cTextureScreen.a );",
+
+			"}"
+
+		].join( "\n" )
+
+	};
+
+
+/***/ },
+/* 16 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.EffectComposer = function ( renderer, renderTarget ) {
+
+		this.renderer = renderer;
+
+		if ( renderTarget === undefined ) {
+
+			var parameters = {
+				minFilter: THREE.LinearFilter,
+				magFilter: THREE.LinearFilter,
+				format: THREE.RGBAFormat,
+				stencilBuffer: false
+			};
+			var size = renderer.getSize();
+			renderTarget = new THREE.WebGLRenderTarget( size.width, size.height, parameters );
+
+		}
+
+		this.renderTarget1 = renderTarget;
+		this.renderTarget2 = renderTarget.clone();
+
+		this.writeBuffer = this.renderTarget1;
+		this.readBuffer = this.renderTarget2;
+
+		this.passes = [];
+
+		if ( THREE.CopyShader === undefined )
+			console.error( "THREE.EffectComposer relies on THREE.CopyShader" );
+
+		this.copyPass = new THREE.ShaderPass( THREE.CopyShader );
+
+	};
+
+	Object.assign( THREE.EffectComposer.prototype, {
+
+		swapBuffers: function() {
+
+			var tmp = this.readBuffer;
+			this.readBuffer = this.writeBuffer;
+			this.writeBuffer = tmp;
+
+		},
+
+		addPass: function ( pass ) {
+
+			this.passes.push( pass );
+
+			var size = this.renderer.getSize();
+			pass.setSize( size.width, size.height );
+
+		},
+
+		insertPass: function ( pass, index ) {
+
+			this.passes.splice( index, 0, pass );
+
+		},
+
+		render: function ( delta ) {
+
+			var maskActive = false;
+
+			var pass, i, il = this.passes.length;
+
+			for ( i = 0; i < il; i ++ ) {
+
+				pass = this.passes[ i ];
+
+				if ( pass.enabled === false ) continue;
+
+				pass.render( this.renderer, this.writeBuffer, this.readBuffer, delta, maskActive );
+
+				if ( pass.needsSwap ) {
+
+					if ( maskActive ) {
+
+						var context = this.renderer.context;
+
+						context.stencilFunc( context.NOTEQUAL, 1, 0xffffffff );
+
+						this.copyPass.render( this.renderer, this.writeBuffer, this.readBuffer, delta );
+
+						context.stencilFunc( context.EQUAL, 1, 0xffffffff );
+
+					}
+
+					this.swapBuffers();
+
+				}
+
+				if ( THREE.MaskPass !== undefined ) {
+
+					if ( pass instanceof THREE.MaskPass ) {
+
+						maskActive = true;
+
+					} else if ( pass instanceof THREE.ClearMaskPass ) {
+
+						maskActive = false;
+
+					}
+
+				}
+
+			}
+
+		},
+
+		reset: function ( renderTarget ) {
+
+			if ( renderTarget === undefined ) {
+
+				var size = this.renderer.getSize();
+
+				renderTarget = this.renderTarget1.clone();
+				renderTarget.setSize( size.width, size.height );
+
+			}
+
+			this.renderTarget1.dispose();
+			this.renderTarget2.dispose();
+			this.renderTarget1 = renderTarget;
+			this.renderTarget2 = renderTarget.clone();
+
+			this.writeBuffer = this.renderTarget1;
+			this.readBuffer = this.renderTarget2;
+
+		},
+
+		setSize: function ( width, height ) {
+
+			this.renderTarget1.setSize( width, height );
+			this.renderTarget2.setSize( width, height );
+
+			for ( var i = 0; i < this.passes.length; i ++ ) {
+
+				this.passes[i].setSize( width, height );
+
+			}
+
+		}
+
+	} );
+
+
+	THREE.Pass = function () {
+
+		// if set to true, the pass is processed by the composer
+		this.enabled = true;
+
+		// if set to true, the pass indicates to swap read and write buffer after rendering
+		this.needsSwap = true;
+
+		// if set to true, the pass clears its buffer before rendering
+		this.clear = false;
+
+		// if set to true, the result of the pass is rendered to screen
+		this.renderToScreen = false;
+
+	};
+
+	Object.assign( THREE.Pass.prototype, {
+
+		setSize: function( width, height ) {},
+
+		render: function ( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			console.error( "THREE.Pass: .render() must be implemented in derived pass." );
+
+		}
+
+	} );
+
+
+/***/ },
+/* 17 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.ShaderPass = function ( shader, textureID ) {
+
+		THREE.Pass.call( this );
+
+		this.textureID = ( textureID !== undefined ) ? textureID : "tDiffuse";
+
+		if ( shader instanceof THREE.ShaderMaterial ) {
+
+			this.uniforms = shader.uniforms;
+
+			this.material = shader;
+
+		} else if ( shader ) {
+
+			this.uniforms = THREE.UniformsUtils.clone( shader.uniforms );
+
+			this.material = new THREE.ShaderMaterial( {
+
+				defines: shader.defines || {},
+				uniforms: this.uniforms,
+				vertexShader: shader.vertexShader,
+				fragmentShader: shader.fragmentShader
+
+			} );
+
+		}
+
+		this.camera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
+		this.scene = new THREE.Scene();
+
+		this.quad = new THREE.Mesh( new THREE.PlaneBufferGeometry( 2, 2 ), null );
+		this.scene.add( this.quad );
+
+	};
+
+	THREE.ShaderPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
+
+		constructor: THREE.ShaderPass,
+
+		render: function( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			if ( this.uniforms[ this.textureID ] ) {
+
+				this.uniforms[ this.textureID ].value = readBuffer.texture;
+
+			}
+
+			this.quad.material = this.material;
+
+			if ( this.renderToScreen ) {
+
+				renderer.render( this.scene, this.camera );
+
+			} else {
+
+				renderer.render( this.scene, this.camera, writeBuffer, this.clear );
+
+			}
+
+		}
+
+	} );
+
+
+/***/ },
+/* 18 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.MaskPass = function ( scene, camera ) {
+
+		THREE.Pass.call( this );
+
+		this.scene = scene;
+		this.camera = camera;
+
+		this.clear = true;
+		this.needsSwap = false;
+
+		this.inverse = false;
+
+	};
+
+	THREE.MaskPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
+
+		constructor: THREE.MaskPass,
+
+		render: function ( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			var context = renderer.context;
+			var state = renderer.state;
+
+			// don't update color or depth
+
+			state.buffers.color.setMask( false );
+			state.buffers.depth.setMask( false );
+
+			// lock buffers
+
+			state.buffers.color.setLocked( true );
+			state.buffers.depth.setLocked( true );
+
+			// set up stencil
+
+			var writeValue, clearValue;
+
+			if ( this.inverse ) {
+
+				writeValue = 0;
+				clearValue = 1;
+
+			} else {
+
+				writeValue = 1;
+				clearValue = 0;
+
+			}
+
+			state.buffers.stencil.setTest( true );
+			state.buffers.stencil.setOp( context.REPLACE, context.REPLACE, context.REPLACE );
+			state.buffers.stencil.setFunc( context.ALWAYS, writeValue, 0xffffffff );
+			state.buffers.stencil.setClear( clearValue );
+
+			// draw into the stencil buffer
+
+			renderer.render( this.scene, this.camera, readBuffer, this.clear );
+			renderer.render( this.scene, this.camera, writeBuffer, this.clear );
+
+			// unlock color and depth buffer for subsequent rendering
+
+			state.buffers.color.setLocked( false );
+			state.buffers.depth.setLocked( false );
+
+			// only render where stencil is set to 1
+
+			state.buffers.stencil.setFunc( context.EQUAL, 1, 0xffffffff );  // draw if == 1
+			state.buffers.stencil.setOp( context.KEEP, context.KEEP, context.KEEP );
+
+		}
+
+	} );
+
+
+	THREE.ClearMaskPass = function () {
+
+		THREE.Pass.call( this );
+
+		this.needsSwap = false;
+
+	};
+
+	THREE.ClearMaskPass.prototype = Object.create( THREE.Pass.prototype );
+
+	Object.assign( THREE.ClearMaskPass.prototype, {
+
+		render: function ( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			renderer.state.buffers.stencil.setTest( false );
+
+		}
+
+	} );
+
+
+/***/ },
+/* 19 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.RenderPass = function ( scene, camera, overrideMaterial, clearColor, clearAlpha ) {
+
+		THREE.Pass.call( this );
+
+		this.scene = scene;
+		this.camera = camera;
+
+		this.overrideMaterial = overrideMaterial;
+
+		this.clearColor = clearColor;
+		this.clearAlpha = ( clearAlpha !== undefined ) ? clearAlpha : 0;
+
+		this.clear = true;
+		this.needsSwap = false;
+
+	};
+
+	THREE.RenderPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
+
+		constructor: THREE.RenderPass,
+
+		render: function ( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			this.scene.overrideMaterial = this.overrideMaterial;
+
+			var oldClearColor, oldClearAlpha;
+
+			if ( this.clearColor ) {
+
+				oldClearColor = renderer.getClearColor().getHex();
+				oldClearAlpha = renderer.getClearAlpha();
+
+				renderer.setClearColor( this.clearColor, this.clearAlpha );
+
+			}
+
+			renderer.render( this.scene, this.camera, this.renderToScreen ? null : readBuffer, this.clear );
+
+			if ( this.clearColor ) {
+
+				renderer.setClearColor( oldClearColor, oldClearAlpha );
+
+			}
+
+			this.scene.overrideMaterial = null;
+
+		}
+
+	} );
+
+
+/***/ },
+/* 20 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.BloomPass = function ( strength, kernelSize, sigma, resolution ) {
+
+		THREE.Pass.call( this );
+
+		strength = ( strength !== undefined ) ? strength : 1;
+		kernelSize = ( kernelSize !== undefined ) ? kernelSize : 25;
+		sigma = ( sigma !== undefined ) ? sigma : 4.0;
+		resolution = ( resolution !== undefined ) ? resolution : 256;
+
+		// render targets
+
+		var pars = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat };
+
+		this.renderTargetX = new THREE.WebGLRenderTarget( resolution, resolution, pars );
+		this.renderTargetY = new THREE.WebGLRenderTarget( resolution, resolution, pars );
+
+		// copy material
+
+		if ( THREE.CopyShader === undefined )
+			console.error( "THREE.BloomPass relies on THREE.CopyShader" );
+
+		var copyShader = THREE.CopyShader;
+
+		this.copyUniforms = THREE.UniformsUtils.clone( copyShader.uniforms );
+
+		this.copyUniforms[ "opacity" ].value = strength;
+
+		this.materialCopy = new THREE.ShaderMaterial( {
+
+			uniforms: this.copyUniforms,
+			vertexShader: copyShader.vertexShader,
+			fragmentShader: copyShader.fragmentShader,
+			blending: THREE.AdditiveBlending,
+			transparent: true
+
+		} );
+
+		// convolution material
+
+		if ( THREE.ConvolutionShader === undefined )
+			console.error( "THREE.BloomPass relies on THREE.ConvolutionShader" );
+
+		var convolutionShader = THREE.ConvolutionShader;
+
+		this.convolutionUniforms = THREE.UniformsUtils.clone( convolutionShader.uniforms );
+
+		this.convolutionUniforms[ "uImageIncrement" ].value = THREE.BloomPass.blurX;
+		this.convolutionUniforms[ "cKernel" ].value = THREE.ConvolutionShader.buildKernel( sigma );
+
+		this.materialConvolution = new THREE.ShaderMaterial( {
+
+			uniforms: this.convolutionUniforms,
+			vertexShader:  convolutionShader.vertexShader,
+			fragmentShader: convolutionShader.fragmentShader,
+			defines: {
+				"KERNEL_SIZE_FLOAT": kernelSize.toFixed( 1 ),
+				"KERNEL_SIZE_INT": kernelSize.toFixed( 0 )
+			}
+
+		} );
+
+		this.needsSwap = false;
+
+		this.camera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
+		this.scene  = new THREE.Scene();
+
+		this.quad = new THREE.Mesh( new THREE.PlaneBufferGeometry( 2, 2 ), null );
+		this.scene.add( this.quad );
+
+	};
+
+	THREE.BloomPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
+
+		constructor: THREE.BloomPass,
+
+		render: function ( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			if ( maskActive ) renderer.context.disable( renderer.context.STENCIL_TEST );
+
+			// Render quad with blured scene into texture (convolution pass 1)
+
+			this.quad.material = this.materialConvolution;
+
+			this.convolutionUniforms[ "tDiffuse" ].value = readBuffer.texture;
+			this.convolutionUniforms[ "uImageIncrement" ].value = THREE.BloomPass.blurX;
+
+			renderer.render( this.scene, this.camera, this.renderTargetX, true );
+
+
+			// Render quad with blured scene into texture (convolution pass 2)
+
+			this.convolutionUniforms[ "tDiffuse" ].value = this.renderTargetX.texture;
+			this.convolutionUniforms[ "uImageIncrement" ].value = THREE.BloomPass.blurY;
+
+			renderer.render( this.scene, this.camera, this.renderTargetY, true );
+
+			// Render original scene with superimposed blur to texture
+
+			this.quad.material = this.materialCopy;
+
+			this.copyUniforms[ "tDiffuse" ].value = this.renderTargetY.texture;
+
+			if ( maskActive ) renderer.context.enable( renderer.context.STENCIL_TEST );
+
+			renderer.render( this.scene, this.camera, readBuffer, this.clear );
+
+		}
+
+	} );
+
+	THREE.BloomPass.blurX = new THREE.Vector2( 0.001953125, 0.0 );
+	THREE.BloomPass.blurY = new THREE.Vector2( 0.0, 0.001953125 );
+
+
+/***/ },
+/* 21 */
+/***/ function(module, exports) {
+
+	/**
+	 * @author alteredq / http://alteredqualia.com/
+	 */
+
+	THREE.FilmPass = function ( noiseIntensity, scanlinesIntensity, scanlinesCount, grayscale ) {
+
+		THREE.Pass.call( this );
+
+		if ( THREE.FilmShader === undefined )
+			console.error( "THREE.FilmPass relies on THREE.FilmShader" );
+
+		var shader = THREE.FilmShader;
+
+		this.uniforms = THREE.UniformsUtils.clone( shader.uniforms );
+
+		this.material = new THREE.ShaderMaterial( {
+
+			uniforms: this.uniforms,
+			vertexShader: shader.vertexShader,
+			fragmentShader: shader.fragmentShader
+
+		} );
+
+		if ( grayscale !== undefined )	this.uniforms.grayscale.value = grayscale;
+		if ( noiseIntensity !== undefined ) this.uniforms.nIntensity.value = noiseIntensity;
+		if ( scanlinesIntensity !== undefined ) this.uniforms.sIntensity.value = scanlinesIntensity;
+		if ( scanlinesCount !== undefined ) this.uniforms.sCount.value = scanlinesCount;
+
+		this.camera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
+		this.scene  = new THREE.Scene();
+
+		this.quad = new THREE.Mesh( new THREE.PlaneBufferGeometry( 2, 2 ), null );
+		this.scene.add( this.quad );
+
+	};
+
+	THREE.FilmPass.prototype = Object.assign( Object.create( THREE.Pass.prototype ), {
+
+		constructor: THREE.FilmPass,
+
+		render: function ( renderer, writeBuffer, readBuffer, delta, maskActive ) {
+
+			this.uniforms[ "tDiffuse" ].value = readBuffer.texture;
+			this.uniforms[ "time" ].value += delta;
+
+			this.quad.material = this.material;
+
+			if ( this.renderToScreen ) {
+
+				renderer.render( this.scene, this.camera );
+
+			} else {
+
+				renderer.render( this.scene, this.camera, writeBuffer, this.clear );
+
+			}
+
+		}
+
+	} );
 
 
 /***/ }

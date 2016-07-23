@@ -13,10 +13,21 @@
     var KingsGame = window.KingsGame || {};
     window.THREE = THREE;
 
+    require('./../../node_modules/three/examples/js/shaders/ConvolutionShader.js');
+	require('./../../node_modules/three/examples/js/shaders/CopyShader.js');
+	require('./../../node_modules/three/examples/js/shaders/FilmShader.js');
+
+	require('./../../node_modules/three/examples/js/postprocessing/EffectComposer.js');
+	require('./../../node_modules/three/examples/js/postprocessing/ShaderPass.js');
+	require('./../../node_modules/three/examples/js/postprocessing/MaskPass.js');
+	require('./../../node_modules/three/examples/js/postprocessing/RenderPass.js');
+	require('./../../node_modules/three/examples/js/postprocessing/BloomPass.js');
+	require('./../../node_modules/three/examples/js/postprocessing/FilmPass.js');
+
     require('./../../node_modules/three/examples/js/loaders/OBJLoader.js');
     require('./../../node_modules/three/examples/js/loaders/MTLLoader.js');
     require('./../../node_modules/three/examples/js/utils/GeometryUtils.js');
-    require('./../../node_modules/three/examples/js/Detector.js');
+    var Detector = require('./../../node_modules/three/examples/js/Detector.js');
     var LoadingScreen = require( __dirname + '/../views/loadingScreen.js');
     var Stats = require('./../../node_modules/three/examples/js/libs/stats.min.js');
 
@@ -326,7 +337,7 @@
     KingsGame.RoadSection = function(parameters) {
         this.id = parameters.id;
         this.position = parameters.position || new CANNON.Vec3();
-        this.size = parameters.size || new CANNON.Vec3(50,50,0.05);
+        this.size = parameters.size || new CANNON.Vec3(25,50,0.05);
         this.HAZARDS = {
             "plain": 0
         };
@@ -347,24 +358,21 @@
         this.groundBody.addShape( groundShape );
         KingsGame.world.addBody( this.groundBody );
 
-        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
-        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
-        bmap.repeat.set( 10, 10 );
-        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
-        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
-        smap.repeat.set( 10, 10 );
-        var groundTexture = new THREE.MeshPhongMaterial({
-            shininess  :  0,
-            bumpMap    :  bmap,
-            map        :  smap,
-            bumpScale  :  0.45,
-        });
         var geometry = new THREE.PlaneGeometry( this.size.x * 2, this.size.y * 2 );
-        this.mesh = new THREE.Mesh( geometry, groundTexture );
+        this.mesh = new THREE.Mesh( geometry, KingsGame.assets.groundTexture );
         this.mesh.position.copy( this.groundBody.position );
         this.mesh.quaternion.copy( this.groundBody.quaternion );
         this.mesh.receiveShadow = true;
         KingsGame.scene.add( this.mesh );
+
+        this.background = new THREE.Mesh( new THREE.PlaneGeometry( 400, this.size.y * 2 ), KingsGame.assets.lavaMaterial );
+        this.background.position.set(
+            this.groundBody.position.x,
+            this.groundBody.position.y,
+            this.groundBody.position.z - 5
+        );
+        this.background.receiveShadow = true;
+        KingsGame.scene.add( this.background );
     };
 
     KingsGame.RoadSection.prototype = {
@@ -391,15 +399,14 @@
         update: function() {
             var index = this.locatePlayer();
             if(index > this.road.length - 3) {
-                console.log(this.road);
                 this.road.push(new KingsGame.RoadSection({
                     id: this.road[3].id + 1,
                     position: new CANNON.Vec3( 0, (this.road[3].id + 1) * -100, -10 )
                 }));
+                KingsGame.scene.remove( this.road[0].background );
                 KingsGame.scene.remove( this.road[0].mesh );
                 KingsGame.world.removeBody ( this.road[0].groundBody );
                 this.road.splice(0,1);
-                console.log(this.road);
             }
             for (var i = 0; i < this.road.length; i++) {
                 this.road[i].update();
@@ -442,6 +449,8 @@
             elements[i].update();
         }
         if( KingsGame.road.insideRoad(KingsGame.gameobjects.player.position) ) {
+            KingsGame.score = Math.max(Math.floor((KingsGame.gameobjects.player.position.y * -1) / 10), KingsGame.score);
+            puntuacion.innerHTML = KingsGame.score;
             KingsGame.road.update();
             KingsGame.sky.position.set(
                 KingsGame.gameobjects.player.position.x,
@@ -502,11 +511,13 @@
         if(!KingsGame.paused) {
             KingsGame.prototype.update();
         }
-        KingsGame.renderer.clear();
         if(KingsGame.ready) {
             Backbone.trigger( 'done' );
         }
-        KingsGame.renderer.render(KingsGame.scene, KingsGame.camera);
+        var delta = 5 * KingsGame.clock.getDelta();
+		KingsGame.assets.lavaUniforms.time.value += 0.2 * delta;
+        KingsGame.renderer.clear();
+        KingsGame.composer.render( delta );
     };
 
     KingsGame.prototype.lockPointer = function() {
@@ -566,9 +577,12 @@
     };
 
     KingsGame.prototype.onWindowResize = function() {
+        KingsGame.assets.lavaUniforms.resolution.value.x = window.innerWidth;
+		KingsGame.assets.lavaUniforms.resolution.value.y = window.innerHeight;
         KingsGame.camera.aspect = window.innerWidth / window.innerHeight;
         KingsGame.camera.updateProjectionMatrix();
         KingsGame.renderer.setSize( window.innerWidth, window.innerHeight );
+        KingsGame.composer.reset();
     }
 
     KingsGame.prototype.onMouseMove = function( event ) {
@@ -687,19 +701,6 @@
         });
         KingsGame.world.addContactMaterial(wheelGroundContactMaterial);
 
-        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
-        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
-        bmap.repeat.set( 10, 10 );
-        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
-        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
-        smap.repeat.set( 10, 10 );
-        var groundTexture = new THREE.MeshPhongMaterial({
-            shininess  :  0,
-            bumpMap    :  bmap,
-            map        :  smap,
-            bumpScale  :  0.45,
-        });
-
         KingsGame.road = new KingsGame.Road();
 
         var mat = new CANNON.Material();
@@ -713,12 +714,17 @@
         body.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), 20*(Math.PI/180));
         KingsGame.world.addBody( body );
 
-        var mesh = new THREE.Mesh( new THREE.CubeGeometry( 8, 20, 0.2 ), groundTexture );
+        var mesh = new THREE.Mesh( new THREE.CubeGeometry( 8, 20, 0.2 ), KingsGame.assets.groundTexture );
         mesh.position.copy( body.position );
         mesh.quaternion.copy( body.quaternion );
         mesh.receiveShadow = true;
         mesh.castShadow = true;
         KingsGame.scene.add( mesh );
+
+        var ballGeometry = new THREE.SphereGeometry( 60, 64, 64 );
+    	var ball = new THREE.Mesh(	ballGeometry,  KingsGame.assets.lavaMaterial );
+    	ball.position.set(0, 165, 0);
+    	KingsGame.scene.add( ball );
     };
 
     KingsGame.prototype.bumper = function(e){
@@ -780,22 +786,63 @@
         };
     };
 
+    KingsGame.prototype.loadAssets = function() {
+        KingsGame.assets = {};
+
+        var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
+        bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
+        bmap.repeat.set( 10, 10 );
+        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_d.jpg" );
+        smap.wrapS = smap.wrapT = THREE.RepeatWrapping;
+        smap.repeat.set( 10, 10 );
+        KingsGame.assets.groundTexture = new THREE.MeshPhongMaterial({
+            shininess  :  0,
+            bumpMap    :  bmap,
+            map        :  smap,
+            bumpScale  :  0.45,
+        });
+
+        var textureLoader = new THREE.TextureLoader(KingsGame.manager);
+		KingsGame.assets.lavaUniforms = {
+			fogDensity: { value: 0.01 },
+			fogColor:   { value: new THREE.Vector3( 0, 0, 0 ) },
+			time:       { value: 1.0 },
+			resolution: { value: new THREE.Vector2() },
+			uvScale:    { value: new THREE.Vector2( 3.0, 1.0 ) },
+			texture1:   { value: textureLoader.load( './assets/textures/cloud.png' ) },
+			texture2:   { value: textureLoader.load( './assets/textures/lava.jpg' ) }
+		};
+
+		KingsGame.assets.lavaUniforms.texture1.value.wrapS = KingsGame.assets.lavaUniforms.texture1.value.wrapT = THREE.RepeatWrapping;
+		KingsGame.assets.lavaUniforms.texture2.value.wrapS = KingsGame.assets.lavaUniforms.texture2.value.wrapT = THREE.RepeatWrapping;
+
+    	KingsGame.assets.lavaMaterial = new THREE.ShaderMaterial({
+    	    uniforms: KingsGame.assets.lavaUniforms,
+    		vertexShader:   document.getElementById( 'vertexShaderLava'   ).textContent,
+    		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent
+    	});
+    };
+
     $.fn.initGame = function( parameters ) {
+        if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
         KingsGame.loadingScreen = new LoadingScreen();
         KingsGame.loadingScreen.render();
         $(document.body).append( KingsGame.loadingScreen.$el );
 
         KingsGame.ready = false;
         KingsGame.gameOver = false;
+        KingsGame.score = 0;
         KingsGame.timeStep = 1.0 / 60.0;
         KingsGame.paused = false;
         KingsGame.firstPerson = false;
+        KingsGame.clock = new THREE.Clock();
         if( parameters.pointerLocked ) {
             KingsGame.prototype.lockPointer();
         }
 
         KingsGame.scene = new THREE.Scene();
-        KingsGame.scene.fog = new THREE.Fog( 0xffffff, 1, 5000 );
+        KingsGame.scene.fog = new THREE.FogExp2( 0x000000, 0.01 );
         KingsGame.scene.fog.color.setHSL( 0.6, 0, 1 );
         var ambient = new THREE.AmbientLight( 0x444444 );
         KingsGame.scene.add( ambient );
@@ -806,8 +853,9 @@
         KingsGame.world.solver.iterations = 10;
         KingsGame.world.defaultContactMaterial.friction = 0.2;
 
-        KingsGame.prototype.initGround();
         KingsGame.prototype.initLoadManager();
+        KingsGame.prototype.loadAssets();
+        KingsGame.prototype.initGround();
         KingsGame.prototype.initGameObjects();
 
         var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
@@ -840,7 +888,7 @@
         var fragmentShader = document.getElementById( 'fragmentShader' ).textContent;
         var uniforms = {
             topColor: 	 { type: "c", value: new THREE.Color( 0x0077ff ) },
-            bottomColor: { type: "c", value: new THREE.Color( 0xffffff ) },
+            bottomColor: { type: "c", value: new THREE.Color( 0x000000 ) },
             offset:		 { type: "f", value: 33 },
             exponent:	 { type: "f", value: 0.6 }
         };
@@ -848,7 +896,12 @@
         KingsGame.scene.fog.color.copy( uniforms.bottomColor.value );
 
         var skyGeo = new THREE.SphereGeometry( 400, 32, 15 );
-        var skyMat = new THREE.ShaderMaterial( { vertexShader: vertexShader, fragmentShader: fragmentShader, uniforms: uniforms, side: THREE.BackSide } );
+        var skyMat = new THREE.ShaderMaterial({
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            uniforms: uniforms,
+            side: THREE.BackSide
+        });
         KingsGame.sky = new THREE.Mesh( skyGeo, skyMat );
         KingsGame.scene.add( KingsGame.sky );
 
@@ -857,7 +910,7 @@
             "thirdPerson" : 1,
             "upView" : 2,
         };
-        KingsGame.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+        KingsGame.camera = new THREE.PerspectiveCamera( 75, (window.innerWidth/2)/(window.innerHeight/2), 0.1, 1000 );
         KingsGame.camera.position.set(0,5,0);
         KingsGame.camera.up = new THREE.Vector3(0,0,1);
         KingsGame.camera.lookAt(new THREE.Vector3(0,0,0));
@@ -883,6 +936,15 @@
         KingsGame.renderer.shadowMap.type = THREE.PCFShadowMap;
         KingsGame.renderer.autoClear = false;
         $(this).append( KingsGame.renderer.domElement );
+
+        var renderModel = new THREE.RenderPass( KingsGame.scene, KingsGame.camera );
+		var effectBloom = new THREE.BloomPass( 0 );
+		var effectFilm = new THREE.FilmPass( 0, 0, 1024, false );
+		effectFilm.renderToScreen = true;
+		KingsGame.composer = new THREE.EffectComposer( KingsGame.renderer );
+		KingsGame.composer.addPass( renderModel );
+		KingsGame.composer.addPass( effectBloom );
+		KingsGame.composer.addPass( effectFilm );
 
         KingsGame.stats = new Stats();
 		$(this).append( KingsGame.stats.dom );
