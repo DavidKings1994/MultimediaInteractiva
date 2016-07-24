@@ -46,15 +46,14 @@
         this.direction = parameters.direction || new THREE.Vector3(0,-5,0);
         this.soundPath = parameters.soundPath || "";
         this.bounciness = parameters.bounciness || 0;
-
-        if(parameters.useMTL) {
-            this.loadObjMtl( parameters.modelPath, parameters.fileName );
-        } else {
-            this.loadObj( parameters.modelPath, parameters.fileName );
-        }
+        this.name = parameters.fileName;
 
         var mat = new CANNON.Material();
-        var shape = new CANNON.Box( new CANNON.Vec3(1,1,1) );
+        var shape = new CANNON.Box( new CANNON.Vec3(
+            this.scale.x/2,
+            this.scale.y/2,
+            this.scale.z/2
+        ) );
         this.body = new CANNON.Body({
             mass: parameters.weight,
             material: mat,
@@ -64,6 +63,19 @@
                 parameters.position.z
             )
         });
+
+        var index = KingsGame.prototype.alreadyLoaded(this.name);
+        if(index >= 0) {
+            console.log(KingsGame.assets.meshes[index]);
+            this.initModel(KingsGame.assets.meshes[index].clone(), false);
+        } else {
+            if(parameters.useMTL) {
+                this.loadObjMtl( parameters.modelPath, parameters.fileName );
+            } else {
+                this.loadObj( parameters.modelPath, parameters.fileName );
+            }
+        }
+
         if(parameters.colideEvent != null) {
             this.body.addEventListener("collide",parameters.colideEvent);
         }
@@ -93,14 +105,19 @@
             }
         },
 
-        initModel(object) {
+        initModel(object, include) {
+            var add = include || true;
             this.model = object;
+            this.model.name = this.name;
             this.model.castShadow = true;
             this.model.receiveShadow = true;
             if(this.soundPath != "") {
                 this.bindSound(this.soundPath);
             }
             KingsGame.scene.add( this.model );
+            if(add) {
+                KingsGame.assets.meshes.push( this.model );
+            }
             this.update();
         },
 
@@ -174,14 +191,14 @@
         this.state = this.STATES.iddle;
         this.mass = parameters.weight || 1;
         this.maxSteerVal = Math.PI / 8;
-        this.maxSpeed = 5;
-        this.maxForce = 50;
+        this.maxSpeed = 10;
+        this.maxForce = 100;
         this.turning = 0;
 
         var chassisShape;
         var centerOfMassAdjust = new CANNON.Vec3(0, 0, 1);
         chassisShape = new CANNON.Box(new CANNON.Vec3(1, 4, 1));
-        var chassisBody = new CANNON.Body({ mass: 20 });
+        var chassisBody = new CANNON.Body({ mass: 40 });
         chassisBody.addShape(chassisShape, centerOfMassAdjust);
         chassisBody.position.set(this.position.x, this.position.y, this.position.z);
         chassisBody.position.vadd(centerOfMassAdjust);
@@ -338,16 +355,9 @@
         this.id = parameters.id;
         this.position = parameters.position || new CANNON.Vec3();
         this.size = parameters.size || new CANNON.Vec3(25,50,0.05);
-        this.HAZARDS = {
-            "plain": 0
-        };
-        this.hazard = parameters.hazard || this.HAZARDS.plain;
-        this.DIFICULTY = {
-            "easy": 0,
-            "medium": 0,
-            "hard": 0
-        };
-        this.dificulty = parameters.dificulty || this.DIFICULTY.easy;
+        this.hazard = parameters.hazard || KingsGame.HAZARDS.plain;
+        this.dificulty = parameters.dificulty || KingsGame.DIFICULTY.easy;
+        console.log("hazard: " + parameters.hazard + " dificulty: " + parameters.dificulty);
 
         this.groundBody = new CANNON.Body({
             mass: 0,
@@ -373,13 +383,125 @@
         );
         this.background.receiveShadow = true;
         KingsGame.scene.add( this.background );
+
+        this.initHazards();
     };
 
     KingsGame.RoadSection.prototype = {
         constructor: KingsGame.RoadSection,
 
+        placeBumper: function(pos) {
+            this.gameobjects.push(new KingsGame.GameObject({
+                modelPath: './assets/models/crate/',
+                fileName: 'crate',
+                useMTL: true,
+                position: pos.add(new THREE.Vector3(0,0,2)),
+                scale: new THREE.Vector3(3,3,3),
+                weight: 0,
+                colideEvent: KingsGame.prototype.bumper
+            }));
+        },
+
+        initHazards: function() {
+            this.gameobjects = [];
+            switch (this.hazard) {
+                case KingsGame.HAZARDS.bumpers: {
+                    switch (this.dificulty) {
+                        case KingsGame.DIFICULTY.easy: {
+                            var rand = Math.floor(Math.random() * 4) + 1;
+                            this.placeBumper(new THREE.Vector3(
+                                this.position.x + ((rand - 2) * 6),
+                                this.position.y,
+                                this.position.z
+                            ));
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.medium: {
+                            var randx = Math.floor(Math.random() * 4) + 1;
+                            var randy = Math.floor(Math.random() * 4) + 1;
+                            this.placeBumper(new THREE.Vector3(
+                                this.position.x + ((randx - 2) * 6),
+                                this.position.y + ((randy - 2) * 12),
+                                this.position.z
+                            ));
+                            var done = false
+                            while(!done) {
+                                var randx2 = Math.floor(Math.random() * 4) + 1;
+                                if(randx2 != randx) {
+                                    done = true;
+                                }
+                            }
+                            var randy2 = Math.floor(Math.random() * 4) + 1;
+                            this.placeBumper(new THREE.Vector3(
+                                this.position.x + ((randx2 - 2) * 6),
+                                this.position.y + ((randy2 - 2) * 12),
+                                this.position.z
+                            ));
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.hard: {
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case KingsGame.HAZARDS.accelerator: {
+                    switch (this.dificulty) {
+                        case KingsGame.DIFICULTY.easy: {
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.medium: {
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.hard: {
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case KingsGame.HAZARDS.pit: {
+                    switch (this.dificulty) {
+                        case KingsGame.DIFICULTY.easy: {
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.medium: {
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.hard: {
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case KingsGame.HAZARDS.helix: {
+                    switch (this.dificulty) {
+                        case KingsGame.DIFICULTY.easy: {
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.medium: {
+                            break;
+                        }
+                        case KingsGame.DIFICULTY.hard: {
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        },
+
         update: function() {
 
+        },
+
+        destroy: function() {
+            KingsGame.scene.remove( this.background );
+            KingsGame.scene.remove( this.mesh );
+            KingsGame.world.removeBody ( this.groundBody );
+            for (var i = 0; i < this.gameobjects.length; i++) {
+                KingsGame.scene.remove( this.gameobjects[i].model );
+                KingsGame.world.removeBody ( this.gameobjects[i].body );
+            }
         },
     };
 
@@ -401,11 +523,11 @@
             if(index > this.road.length - 3) {
                 this.road.push(new KingsGame.RoadSection({
                     id: this.road[3].id + 1,
-                    position: new CANNON.Vec3( 0, (this.road[3].id + 1) * -100, -10 )
+                    position: new CANNON.Vec3( 0, (this.road[3].id + 1) * -100, -10 ),
+                    hazard: KingsGame.HAZARDS.bumpers,
+                    dificulty: KingsGame.DIFICULTY.medium
                 }));
-                KingsGame.scene.remove( this.road[0].background );
-                KingsGame.scene.remove( this.road[0].mesh );
-                KingsGame.world.removeBody ( this.road[0].groundBody );
+                this.road[0].destroy();
                 this.road.splice(0,1);
             }
             for (var i = 0; i < this.road.length; i++) {
@@ -430,7 +552,7 @@
         },
 
         insideRoad(position) {
-            if((position.x > -50 && position.x < 50) && (position.z > -15)) {
+            if((position.x > -25 && position.x < 25) && (position.z > -15)) {
                 return true;
             }
             return false;
@@ -604,8 +726,8 @@
             break;
         case 83: // s
         case 40: // backward
-            KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : -KingsGame.gameobjects.player.maxForce/2, 2);
-            KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : KingsGame.gameobjects.player.maxForce/2, 3);
+            KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : -KingsGame.gameobjects.player.maxForce, 2);
+            KingsGame.gameobjects.player.vehicle.setWheelForce(up ? 0 : KingsGame.gameobjects.player.maxForce, 3);
             break;
         case 65: // a
         case 37: // left
@@ -786,8 +908,18 @@
         };
     };
 
+    KingsGame.prototype.alreadyLoaded = function(name) {
+        for (var i = 0; i < KingsGame.assets.meshes.length; i++) {
+            if ( KingsGame.assets.meshes[i].name.localeCompare(name) == 0 ) {
+                return i;
+            }
+        }
+        return -1;
+    };
+
     KingsGame.prototype.loadAssets = function() {
         KingsGame.assets = {};
+        KingsGame.assets.meshes = [];
 
         var bmap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/ground_b.png" );
         bmap.wrapS = bmap.wrapT = THREE.RepeatWrapping;
@@ -823,12 +955,39 @@
     	});
     };
 
+    KingsGame.prototype.restart = function() {
+        KingsGame.gameobjects.player.body.position.set(0,0,0);
+
+        KingsGame.ready = false;
+        KingsGame.gameOver = false;
+        KingsGame.score = 0;
+        KingsGame.timeStep = 1.0 / 60.0;
+        KingsGame.paused = false;
+
+        KingsGame.prototype.initGround();
+        KingsGame.prototype.initGameObjects();
+    };
+
     $.fn.initGame = function( parameters ) {
         if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
         KingsGame.loadingScreen = new LoadingScreen();
         KingsGame.loadingScreen.render();
         $(document.body).append( KingsGame.loadingScreen.$el );
+
+        KingsGame.HAZARDS = {
+            "plain": 0,
+            "bumpers": 1,
+            "accelerator": 2,
+            "pit": 3,
+            "helix": 4,
+        };
+
+        KingsGame.DIFICULTY = {
+            "easy": 0,
+            "medium": 1,
+            "hard": 2
+        };
 
         KingsGame.ready = false;
         KingsGame.gameOver = false;
