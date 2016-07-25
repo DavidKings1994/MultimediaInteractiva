@@ -1,0 +1,26 @@
+.gameOverScreen {
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    position: absolute;
+    top: 0;
+    display: none;
+    text-align: center;
+}
+
+.gameOverScreen .messageContainer {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 40px;
+}
+
+.gameOverScreen #restartButton {
+    height: 100px;
+    width: 200px;
+    color: white;
+    background-color: gray;
+    border-radius: 15px;
+}
