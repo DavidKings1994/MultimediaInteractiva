@@ -66,8 +66,6 @@
         });
         this.body.addShape(shape);
         this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), this.rotation.x*(Math.PI/180));
-        //this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), this.rotation.y*(Math.PI/180));
-        //this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0,0,1), this.rotation.z*(Math.PI/180));
 
         if(parameters.colideEvent != null) {
             this.body.addEventListener("collide",parameters.colideEvent);
@@ -692,6 +690,7 @@
             elements[i].update();
         }
         if( KingsGame.road.insideRoad(KingsGame.gameobjects.player.position) ) {
+            KingsGame.fireBall.position.y = Math.min(KingsGame.gameobjects.player.position.y+100,KingsGame.fireBall.position.y);
             KingsGame.score = Math.max(Math.floor((KingsGame.gameobjects.player.position.y * -1) / 10), KingsGame.score);
             puntuacion.innerHTML = KingsGame.score;
             KingsGame.road.update();
@@ -963,10 +962,13 @@
 
         KingsGame.road = new KingsGame.Road();
 
+        if(KingsGame.fireBall != null) {
+            KingsGame.scene.remove( KingsGame.fireBall );
+        }
         var ballGeometry = new THREE.SphereGeometry( 60, 64, 64 );
-    	var ball = new THREE.Mesh(	ballGeometry,  KingsGame.assets.lavaMaterial );
-    	ball.position.set(0, 165, 0);
-    	KingsGame.scene.add( ball );
+    	KingsGame.fireBall = new THREE.Mesh( ballGeometry, KingsGame.assets.lavaMaterial );
+    	KingsGame.fireBall.position.set(0, 165, 0);
+    	KingsGame.scene.add( KingsGame.fireBall );
     };
 
     KingsGame.prototype.bumper = function(e){
@@ -1053,7 +1055,8 @@
     	KingsGame.assets.lavaMaterial = new THREE.ShaderMaterial({
     	    uniforms: KingsGame.assets.lavaUniforms,
     		vertexShader:   document.getElementById( 'vertexShaderLava'   ).textContent,
-    		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent
+    		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent,
+            side: THREE.DoubleSide
     	});
     };
 

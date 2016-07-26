@@ -10129,8 +10129,8 @@
 	    __webpack_require__(18);
 	    var Detector = __webpack_require__(19);
 	    var LoadingScreen = __webpack_require__( 20);
-	    var GameOverScreen = __webpack_require__( 22);
-	    var Stats = __webpack_require__(21);
+	    var GameOverScreen = __webpack_require__( 21);
+	    var Stats = __webpack_require__(22);
 
 	    var KingsGame = ( function() {
 	        function KingsGame() {
@@ -10166,8 +10166,6 @@
 	        });
 	        this.body.addShape(shape);
 	        this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), this.rotation.x*(Math.PI/180));
-	        //this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), this.rotation.y*(Math.PI/180));
-	        //this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0,0,1), this.rotation.z*(Math.PI/180));
 
 	        if(parameters.colideEvent != null) {
 	            this.body.addEventListener("collide",parameters.colideEvent);
@@ -10792,6 +10790,7 @@
 	            elements[i].update();
 	        }
 	        if( KingsGame.road.insideRoad(KingsGame.gameobjects.player.position) ) {
+	            KingsGame.fireBall.position.y = Math.min(KingsGame.gameobjects.player.position.y+100,KingsGame.fireBall.position.y);
 	            KingsGame.score = Math.max(Math.floor((KingsGame.gameobjects.player.position.y * -1) / 10), KingsGame.score);
 	            puntuacion.innerHTML = KingsGame.score;
 	            KingsGame.road.update();
@@ -11063,10 +11062,13 @@
 
 	        KingsGame.road = new KingsGame.Road();
 
+	        if(KingsGame.fireBall != null) {
+	            KingsGame.scene.remove( KingsGame.fireBall );
+	        }
 	        var ballGeometry = new THREE.SphereGeometry( 60, 64, 64 );
-	    	var ball = new THREE.Mesh(	ballGeometry,  KingsGame.assets.lavaMaterial );
-	    	ball.position.set(0, 165, 0);
-	    	KingsGame.scene.add( ball );
+	    	KingsGame.fireBall = new THREE.Mesh( ballGeometry, KingsGame.assets.lavaMaterial );
+	    	KingsGame.fireBall.position.set(0, 165, 0);
+	    	KingsGame.scene.add( KingsGame.fireBall );
 	    };
 
 	    KingsGame.prototype.bumper = function(e){
@@ -11153,7 +11155,8 @@
 	    	KingsGame.assets.lavaMaterial = new THREE.ShaderMaterial({
 	    	    uniforms: KingsGame.assets.lavaUniforms,
 	    		vertexShader:   document.getElementById( 'vertexShaderLava'   ).textContent,
-	    		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent
+	    		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent,
+	            side: THREE.DoubleSide
 	    	});
 	    };
 
@@ -72891,17 +72894,6 @@
 
 /***/ },
 /* 21 */
-/***/ function(module, exports) {
-
-	// stats.js - http://github.com/mrdoob/stats.js
-	var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
-	if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
-	Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
-	v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
-
-
-/***/ },
-/* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone) {
@@ -72911,6 +72903,54 @@
 	        initialize: function() {
 	            Backbone.on("gameOver", this.showScreen, true);
 	            Backbone.on("restart", this.hideScreen, true);
+
+	            window.fbAsyncInit = function() {
+	                FB.init({
+	                    appId      : '1652597161732445',
+	                    cookie     : true,
+	                    xfbml      : true,
+	                    version    : 'v2.2'
+	                });
+
+	                FB.getLoginStatus(function(response) {
+	                    statusChangeCallback(response);
+	                });
+
+	            };
+
+	            (function(d, s, id) {
+	                var js, fjs = d.getElementsByTagName(s)[0];
+	                if (d.getElementById(id)) return;
+	                js = d.createElement(s); js.id = id;
+	                js.src = "//connect.facebook.net/en_US/sdk.js";
+	                fjs.parentNode.insertBefore(js, fjs);
+	            }(document, 'script', 'facebook-jssdk'));
+	        },
+	        checkLoginState: function() {
+	            FB.getLoginStatus(function(response) {
+	                this.statusChangeCallback(response);
+	            });
+	        },
+	        testAPI: function() {
+	            console.log('Welcome!  Fetching your information.... ');
+	            FB.api('/me', function(response) {
+	                console.log(response);
+	                document.getElementById('status').innerHTML =
+	                'Thanks for logging in, ' + response.name + '!';
+	            });
+	        },
+	        statusChangeCallback: function(response) {
+	            console.log('statusChangeCallback');
+	            console.log(response);
+	            if (response.status === 'connected') {
+	                this.testAPI();
+	            } else if (response.status === 'not_authorized') {
+	                document.getElementById('status').innerHTML = 'Please log ' +
+	                'into this app.';
+	            } else {
+	                document.getElementById('status').innerHTML = 'Please log ' +
+	                'into Facebook.';
+	            }
 	        },
 	        showScreen: function() {
 	            $(".gameOverScreen").css("display", "block");
@@ -72933,13 +72973,40 @@
 	            var messageContainer = $("<div />", {
 	                class: "messageContainer"
 	            });
+	            var likeButton = $("<div />", {
+	                class: "fb-like",
+	                css: {
+	                    "display": "block"
+	                }
+	            });
+	            $(likeButton).attr("data-layout","button_count");
+	            $(likeButton).attr("data-href","www.multimediainteractiva.ga");
+	            $(likeButton).attr("data-share","true");
+	            $(likeButton).attr("data-width","450");
+	            $(likeButton).attr("data-show-faces","true");
+	            var loginButton = $("<fb:login-button />", {});
+	            $(loginButton).on("login", this.checkLoginState);
+	            $(loginButton).attr("scope", "public_profile,email");
 	            messageContainer.append(message);
 	            messageContainer.append(this.button);
+	            messageContainer.append(likeButton);
+	            messageContainer.append(loginButton);
 	            this.$el.append(messageContainer);
 	        }
 	    });
 	    return gameOverScreen;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__))
+
+
+/***/ },
+/* 22 */
+/***/ function(module, exports) {
+
+	// stats.js - http://github.com/mrdoob/stats.js
+	var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
+	if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
+	Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
+	v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
 
 
 /***/ }
