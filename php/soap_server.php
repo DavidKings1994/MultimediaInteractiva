@@ -9,9 +9,8 @@
 	$URL = "http://www.multimediainteractiva.ga/php/soap_server.php";
 	$namespace = $URL.'?wsdl';
 
-	function connect()
-	{
-		$link = mysqli_connect('localhost', 'root', 'jjkli8jlkjlu', 'mia')
+	function connect() {
+		$link = mysqli_connect('pdb6.awardspace.net', '1079747_usuarios', 'jjkli8jlkjlu', '1079747_usuarios')
 	    	or die('No se pudo conectar: ' . mysql_error());
 	    	return $link;
 	}
@@ -21,38 +20,32 @@
 	$server->wsdl->schemaTargetNamespace = "urn:server";
 
 	$server->register('get_message',array("name" => "xsd:string"),array("return" => "xsd:string"),"urn:server","urn:server#get_message",'rpc','encoded','Just say hello');
-	$server->register('registro',array("nombre" => "xsd:string", "puntos" => "xsd:string"),array(),"urn:server","urn:server#registro",'rpc','encoded','registra puntuaciones');
+	$server->register('registro',array("nombre" => "xsd:string", "puntos" => "xsd:string", "idPuntuacion" => "xsd:string", "urlFoto" => "xsd:string"),array(),"urn:server","urn:server#registro",'rpc','encoded','registra puntuaciones');
 	$server->register('leaderBoard',array(),array("return" => "xsd:string"),"urn:server","urn:server#leaderBoard",'rpc','encoded','todos los datos');
 
-	function get_message($name)
-	{
-		if(!isset($name))
-		{
+	function get_message($name) {
+		if(!isset($name)) {
 			return new soap_fault('Client','','Put Your Name!');
 		}
 		$result = "Welcome to ".$name.". Thanks for Your First Web Service Using PHP with SOAP";
 		return $result;
 	}
 
-	function registro($nombre, $puntos)
-	{
+	function registro($nombre, $puntos, $idPuntuacion, $urlFoto) {
 		$link = connect();
-		$query = mysqli_prepare($link, "CALL resgistrarPuntuacion(?,?);");
-		$query->bind_param('si', $nombre, $puntos);
+		$query = mysqli_prepare($link, "CALL resgistrarPuntuacion(?,?,?,?);");
+		$query->bind_param('siis', $nombre, $puntos, $idPuntuacion, $urlFoto);
 		$query->execute();
-		if(!$query)
-		{
+		if(!$query) {
 			echo "CALL failed: (" . $link->errno . ") " . $link->error;
 		}
 	}
 
-	function leaderBoard()
-	{
+	function leaderBoard() {
 		$link = connect();
 		$resul = mysqli_query($link, "CALL mostrarPuntuaciones();");
 		$row = array();
-		while($r = mysqli_fetch_assoc($resul))
-		{
+		while($r = mysqli_fetch_assoc($resul)) {
 			$row[] = $r;
 		}
 		return json_encode($row);

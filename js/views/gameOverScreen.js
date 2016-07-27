@@ -4,8 +4,9 @@ define(['jquery','Backbone'], function($, Backbone) {
         className: "gameOverScreen",
         initialize: function() {
             Backbone.on("gameOver", this.showScreen, true);
+            Backbone.on("gameOver", this.checkLoginState, this);
             Backbone.on("restart", this.hideScreen, true);
-
+            var self = this;
             window.fbAsyncInit = function() {
                 FB.init({
                     appId      : '1652597161732445',
@@ -14,8 +15,18 @@ define(['jquery','Backbone'], function($, Backbone) {
                     version    : 'v2.2'
                 });
 
+                FB.Event.subscribe('auth.login', function(response) {
+                    console.log(response);
+                    self.checkLoginState();
+                });
+
+                FB.Event.subscribe('auth.logout', function(response) {
+                    console.log(response);
+                    self.checkLoginState();
+                });
+
                 FB.getLoginStatus(function(response) {
-                    statusChangeCallback(response);
+                    self.statusChangeCallback(response);
                 });
 
             };
@@ -28,39 +39,56 @@ define(['jquery','Backbone'], function($, Backbone) {
                 fjs.parentNode.insertBefore(js, fjs);
             }(document, 'script', 'facebook-jssdk'));
         },
+        uploadInformation: function(parameters) {
+            $.post("./../../php/registro.php",
+            {
+                nombre: parameters.name,
+                puntos: parameters.score,
+                idPuntuacion: parameters.id,
+                urlFoto: parameters.url
+            },
+            function(data, status){
+                console.log("Data: " + data + "\nStatus: " + status);
+            });
+        },
         checkLoginState: function() {
+            var self = this;
             FB.getLoginStatus(function(response) {
-                this.statusChangeCallback(response);
+                self.statusChangeCallback(response);
             });
         },
         testAPI: function() {
-            console.log('Welcome!  Fetching your information.... ');
+            var self = this;
             FB.api('/me', function(response) {
-                console.log(response);
-                document.getElementById('status').innerHTML =
-                'Thanks for logging in, ' + response.name + '!';
+                var _id = response.id;
+                var _name = response.name;
+                FB.api("/"+response.id+"/picture?redirect=0", function (response) {
+                    if (response && !response.error) {
+                        self.uploadInformation({
+                            name: _name,
+                            score: puntuacion.innerHTML,
+                            id: _id,
+                            url: response.data.url
+                        });
+                    }
+                });
             });
         },
         statusChangeCallback: function(response) {
-            console.log('statusChangeCallback');
             console.log(response);
             if (response.status === 'connected') {
                 this.testAPI();
             } else if (response.status === 'not_authorized') {
-                document.getElementById('status').innerHTML = 'Please log ' +
-                'into this app.';
+
             } else {
-                document.getElementById('status').innerHTML = 'Please log ' +
-                'into Facebook.';
+
             }
         },
         showScreen: function() {
             $(".gameOverScreen").css("display", "block");
-            console.log("gameOver");
         },
         hideScreen: function() {
             $(".gameOverScreen").css("display", "none");
-            console.log("restart");
         },
         render: function() {
             this.button = $("<input />", {
@@ -82,13 +110,16 @@ define(['jquery','Backbone'], function($, Backbone) {
                 }
             });
             $(likeButton).attr("data-layout","button_count");
-            $(likeButton).attr("data-href","www.multimediainteractiva.ga");
+            $(likeButton).attr("data-href","multimediainteractiva.ga");
             $(likeButton).attr("data-share","true");
             $(likeButton).attr("data-width","450");
             $(likeButton).attr("data-show-faces","true");
             var loginButton = $("<fb:login-button />", {});
             $(loginButton).on("login", this.checkLoginState);
-            $(loginButton).attr("scope", "public_profile,email");
+            $(loginButton).attr("data-scope", "public_profile,email");
+            $(loginButton).attr("auto_logout_link","true");
+            $(loginButton).attr("enable_profile_selector","true");
+            $(loginButton).attr("return_scopes","true");
             messageContainer.append(message);
             messageContainer.append(this.button);
             messageContainer.append(likeButton);
