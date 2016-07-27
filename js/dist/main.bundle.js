@@ -10130,7 +10130,7 @@
 	    var Detector = __webpack_require__(19);
 	    var LoadingScreen = __webpack_require__( 20);
 	    var GameOverScreen = __webpack_require__( 21);
-	    var Stats = __webpack_require__(22);
+	    var Stats = __webpack_require__(23);
 
 	    var KingsGame = ( function() {
 	        function KingsGame() {
@@ -72896,14 +72896,14 @@
 /* 21 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone) {
+	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3),__webpack_require__(22)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone, LeaderBoard) {
 	    var gameOverScreen = Backbone.View.extend({
 	        tagname: "div",
 	        className: "gameOverScreen",
 	        initialize: function() {
-	            Backbone.on("gameOver", this.showScreen, true);
+	            Backbone.on("gameOver", this.showScreen, this);
 	            Backbone.on("gameOver", this.checkLoginState, this);
-	            Backbone.on("restart", this.hideScreen, true);
+	            Backbone.on("restart", this.hideScreen, this);
 	            var self = this;
 	            window.fbAsyncInit = function() {
 	                FB.init({
@@ -72938,6 +72938,7 @@
 	            }(document, 'script', 'facebook-jssdk'));
 	        },
 	        uploadInformation: function(parameters) {
+	            var self = this;
 	            $.post("./../../php/registro.php",
 	            {
 	                nombre: parameters.name,
@@ -72946,7 +72947,18 @@
 	                urlFoto: parameters.url
 	            },
 	            function(data, status){
-	                console.log("Data: " + data + "\nStatus: " + status);
+	                self.downloadInformation();
+	            });
+	        },
+	        downloadInformation: function() {
+	            $.post("./../../php/consulta.php",{},
+	            function(json, status){
+	                console.log("Data: " + json + "\nStatus: " + status);
+	                var query = $.parseJSON(json);
+	                var leaderBoard = new LeaderBoard({ data: query });
+	                leaderBoard.render();
+	                $(".leaderBoardContainer").empty();
+	                $(".leaderBoardContainer").append(leaderBoard.$el);
 	            });
 	        },
 	        checkLoginState: function() {
@@ -72989,14 +73001,13 @@
 	            $(".gameOverScreen").css("display", "none");
 	        },
 	        render: function() {
+	            this.leaderBoardContainer = $("<div />", {
+	                class: "leaderBoardContainer"
+	            });
 	            this.button = $("<input />", {
 	                type: "button",
 	                id: "restartButton",
 	                value: "try again!"
-	            });
-	            var message = $("<p />", {
-	                class: "message",
-	                text: "Game Over"
 	            });
 	            var messageContainer = $("<div />", {
 	                class: "messageContainer"
@@ -73018,10 +73029,10 @@
 	            $(loginButton).attr("auto_logout_link","true");
 	            $(loginButton).attr("enable_profile_selector","true");
 	            $(loginButton).attr("return_scopes","true");
-	            messageContainer.append(message);
+	            messageContainer.append(loginButton);
+	            messageContainer.append(this.leaderBoardContainer);
 	            messageContainer.append(this.button);
 	            messageContainer.append(likeButton);
-	            messageContainer.append(loginButton);
 	            this.$el.append(messageContainer);
 	        }
 	    });
@@ -73031,6 +73042,33 @@
 
 /***/ },
 /* 22 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3),__webpack_require__(24)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone, LeaderBoardRow) {
+	    var leaderBoard = Backbone.View.extend({
+	        tagname: "div",
+	        className: "leaderBoard",
+	        initialize: function(parameters) {
+	            this.data = parameters.data;
+	        },
+	        render: function() {
+	            for (var i = 0; i < this.data.length; i++) {
+	                var row = new LeaderBoardRow({
+	                    url: this.data[i].urlFoto,
+	                    name: this.data[i].usuario,
+	                    score: this.data[i].puntos
+	                });
+	                row.render();
+	                this.$el.append(row.$el);
+	            }
+	        }
+	    });
+	    return leaderBoard;
+	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__))
+
+
+/***/ },
+/* 23 */
 /***/ function(module, exports) {
 
 	// stats.js - http://github.com/mrdoob/stats.js
@@ -73038,6 +73076,41 @@
 	if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
 	Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
 	v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
+
+
+/***/ },
+/* 24 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone) {
+	    var leaderBoardRow = Backbone.View.extend({
+	        tagname: "div",
+	        className: "leaderBoardRow",
+	        initialize: function(parameters) {
+	            this.url = parameters.url;
+	            this.name = parameters.name;
+	            this.score = parameters.score;
+	        },
+	        render: function() {
+	            var picture = $("<img />", {
+	                class: "image",
+	                src: this.url
+	            });
+	            var name = $("<p />", {
+	                class: "text",
+	                text: this.name
+	            });
+	            var score = $("<p />", {
+	                class: "text",
+	                text: this.score
+	            });
+	            this.$el.append(picture);
+	            this.$el.append(name);
+	            this.$el.append(score);
+	        }
+	    });
+	    return leaderBoardRow;
+	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__))
 
 
 /***/ }

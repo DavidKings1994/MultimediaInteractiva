@@ -1,11 +1,11 @@
-define(['jquery','Backbone'], function($, Backbone) {
+define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, LeaderBoard) {
     var gameOverScreen = Backbone.View.extend({
         tagname: "div",
         className: "gameOverScreen",
         initialize: function() {
-            Backbone.on("gameOver", this.showScreen, true);
+            Backbone.on("gameOver", this.showScreen, this);
             Backbone.on("gameOver", this.checkLoginState, this);
-            Backbone.on("restart", this.hideScreen, true);
+            Backbone.on("restart", this.hideScreen, this);
             var self = this;
             window.fbAsyncInit = function() {
                 FB.init({
@@ -40,6 +40,7 @@ define(['jquery','Backbone'], function($, Backbone) {
             }(document, 'script', 'facebook-jssdk'));
         },
         uploadInformation: function(parameters) {
+            var self = this;
             $.post("./../../php/registro.php",
             {
                 nombre: parameters.name,
@@ -48,7 +49,18 @@ define(['jquery','Backbone'], function($, Backbone) {
                 urlFoto: parameters.url
             },
             function(data, status){
-                console.log("Data: " + data + "\nStatus: " + status);
+                self.downloadInformation();
+            });
+        },
+        downloadInformation: function() {
+            $.post("./../../php/consulta.php",{},
+            function(json, status){
+                console.log("Data: " + json + "\nStatus: " + status);
+                var query = $.parseJSON(json);
+                var leaderBoard = new LeaderBoard({ data: query });
+                leaderBoard.render();
+                $(".leaderBoardContainer").empty();
+                $(".leaderBoardContainer").append(leaderBoard.$el);
             });
         },
         checkLoginState: function() {
@@ -91,14 +103,13 @@ define(['jquery','Backbone'], function($, Backbone) {
             $(".gameOverScreen").css("display", "none");
         },
         render: function() {
+            this.leaderBoardContainer = $("<div />", {
+                class: "leaderBoardContainer"
+            });
             this.button = $("<input />", {
                 type: "button",
                 id: "restartButton",
                 value: "try again!"
-            });
-            var message = $("<p />", {
-                class: "message",
-                text: "Game Over"
             });
             var messageContainer = $("<div />", {
                 class: "messageContainer"
@@ -120,10 +131,10 @@ define(['jquery','Backbone'], function($, Backbone) {
             $(loginButton).attr("auto_logout_link","true");
             $(loginButton).attr("enable_profile_selector","true");
             $(loginButton).attr("return_scopes","true");
-            messageContainer.append(message);
+            messageContainer.append(loginButton);
+            messageContainer.append(this.leaderBoardContainer);
             messageContainer.append(this.button);
             messageContainer.append(likeButton);
-            messageContainer.append(loginButton);
             this.$el.append(messageContainer);
         }
     });

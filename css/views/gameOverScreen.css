@@ -18,9 +18,11 @@
 }
 
 .gameOverScreen #restartButton {
-    height: 100px;
     width: 200px;
+    height: 60px;
     color: white;
     background-color: gray;
     border-radius: 15px;
+    font-family: OpenSans-Bold;
+    font-size: 25px;
 }

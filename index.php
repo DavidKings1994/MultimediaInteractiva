@@ -5,13 +5,14 @@
     <script type="text/javascript" src="js/dist/main.bundle.js"></script>
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <meta name="author" content="David Reyes">
-    <meta name="keywords" content="David,Reyes,programador,web,multimedia,interactiva,lmad,uanl,animacion,digital,facultad,ciencias,fisico,matematicas">
+    <meta name="keywords" content="David,Reyes,programador,web,multimedia,interactiva,lmad,uanl,infinite,runner,hell,scape">
     <meta name="description" content="proyecto final de la materia de multimedia y animacion digital de LMAD en FCFM">
     <link rel="shortcut icon" type="image/x-icon" href="img/logo.png" />`
     <link rel="stylesheet" type="text/css" href="css/main.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <link rel="stylesheet" type="text/css" href="css/views/loadingScreen.css">
     <link rel="stylesheet" type="text/css" href="css/views/gameOverScreen.css">
+    <link rel="stylesheet" type="text/css" href="css/views/leaderboard.css">
     <link rel="stylesheet" type="text/css" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
 </head>
 <body>
