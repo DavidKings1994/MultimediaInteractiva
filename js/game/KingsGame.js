@@ -423,6 +423,73 @@
         }
     };
 
+    KingsGame.ParticleSystem = function(parameters){
+        this.sistemType = parameters.sistemType || "rain";
+        this.gravity = parameters.gravity || new THREE.Vector3();
+        this.position = parameters.position || new THREE.Vector3();
+        this.radius = parameters.radius || 5;
+        this.particleLife = parameters.particleLife || -1;
+        this.particleCount = parameters.particleCount || 100;
+
+        var particles = new THREE.Geometry(),
+        pMaterial = new THREE.PointsMaterial({
+            color: 0xFFFFFF,
+            size: 1,
+            map: new THREE.TextureLoader(KingsGame.manager).load("./assets/textures/particle.png"),
+            blending: THREE.AdditiveBlending,
+            transparent: true
+        });
+
+        for (var p = 0; p < this.particleCount; p++) {
+            var pX = Math.random() * (this.radius*2) - this.radius;
+            var pY = Math.random() * (this.radius*2) - this.radius;
+            var pZ = Math.random() * (this.radius*2) - this.radius;
+            var particle = new THREE.Vector3(this.position.x + pX, this.position.y + pY, this.position.z + pZ);
+            particle.life = this.particleLife;
+            particles.vertices.push(particle);
+        }
+
+        this.particleSystem = new THREE.PointCloud(particles,pMaterial);
+        this.particleSystem.sortParticles = true;
+        KingsGame.scene.add(this.particleSystem);
+    };
+
+    KingsGame.ParticleSystem.prototype = {
+        constructor: KingsGame.ParticleSystem,
+
+        update: function() {
+            this.particleSystem.position.copy(this.position);
+            switch (this.sistemType) {
+                case "rain": {
+                    var pCount = this.particleCount;
+                    while (pCount--) {
+                        var particle = this.particleSystem.geometry.vertices[pCount];
+                        if (particle.z < -20) {
+                            particle.z = this.position.z;
+                        }
+                        particle.z -= Math.random() * .1;
+                        particle.add(this.gravity);
+                    }
+                    break;
+                }
+                case "fountain": {
+                    var pCount = this.particleCount;
+                    while (pCount--) {
+                        var particle = this.particleSystem.geometry.vertices[pCount];
+                        if (particle.z < -200) {
+                            particle.z = 200;
+                        }
+                        particle.z -= Math.random() * .1;
+                        particle.add(this.gravity);
+                    }
+                    break;
+                }
+            }
+            this.particleSystem.geometry.__dirtyVertices = true;
+            this.particleSystem.geometry.verticesNeedUpdate = true;
+        }
+    };
+
     KingsGame.RoadSection = function(parameters) {
         this.id = parameters.id;
         this.position = parameters.position || new CANNON.Vec3();
@@ -684,6 +751,9 @@
 
     KingsGame.prototype.update = function () {
         KingsGame.stats.update();
+        KingsGame.rain.position.x = KingsGame.gameobjects.player.position.x;
+        KingsGame.rain.position.y = KingsGame.gameobjects.player.position.y;
+        KingsGame.rain.update();
         KingsGame.prototype.updatePhysics();
         var elements = _.toArray(KingsGame.gameobjects);
         for (var i = 0; i < elements.length; i++) {
@@ -741,10 +811,6 @@
                 }
             }
         } else {
-            if(!KingsGame.gameOver) {
-                Backbone.trigger("gameOver");
-                KingsGame.gameOver = true;
-            }
             KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
         }
         KingsGame.dirLight.position.set(
@@ -969,6 +1035,23 @@
     	KingsGame.fireBall = new THREE.Mesh( ballGeometry, KingsGame.assets.lavaMaterial );
     	KingsGame.fireBall.position.set(0, 165, 0);
     	KingsGame.scene.add( KingsGame.fireBall );
+
+        var groundBody = new CANNON.Body({
+            mass: 0,
+            position: new CANNON.Vec3(0,0,-25)
+        });
+        var groundShape = new CANNON.Plane();
+        groundBody.addShape(groundShape);
+        var callback = function(e) {
+            if(e.body.name == "player" || e.body.name == "wheel") {
+                if(!KingsGame.gameOver) {
+                    Backbone.trigger("gameOver");
+                    KingsGame.gameOver = true;
+                }
+            }
+        };
+        groundBody.addEventListener("collide", callback);
+        KingsGame.world.addBody(groundBody);
     };
 
     KingsGame.prototype.bumper = function(e){
@@ -1128,6 +1211,12 @@
         KingsGame.prototype.loadAssets();
         KingsGame.prototype.initGround();
         KingsGame.prototype.initGameObjects();
+        KingsGame.rain = new KingsGame.ParticleSystem({
+            position: new THREE.Vector3(0,0,10),
+            gravity: new THREE.Vector3(0,0,-0.8),
+            particleCount: 10000,
+            radius: 50
+        });
 
         var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
         hemiLight.color.setHSL( 0.6, 1, 0.6 );

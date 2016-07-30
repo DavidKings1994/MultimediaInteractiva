@@ -34,7 +34,7 @@
 	function registro($nombre, $puntos, $idPuntuacion, $urlFoto) {
 		$link = connect();
 		$query = mysqli_prepare($link, "CALL resgistrarPuntuacion(?,?,?,?);");
-		$query->bind_param('siis', $nombre, $puntos, $idPuntuacion, $urlFoto);
+		$query->bind_param('siss', $nombre, $puntos, $idPuntuacion, $urlFoto);
 		$query->execute();
 		if(!$query) {
 			echo "CALL failed: (" . $link->errno . ") " . $link->error;

@@ -41,11 +41,12 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
         },
         uploadInformation: function(parameters) {
             var self = this;
+            console.log(parameters);
             $.post("./../../php/registro.php",
             {
                 nombre: parameters.name,
-                puntos: parameters.score,
-                idPuntuacion: parameters.id,
+                puntos: parseInt(parameters.score.toString()),
+                idPuntuacion: parameters.id.toString(),
                 urlFoto: parameters.url
             },
             function(data, status){
@@ -109,7 +110,7 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
             this.button = $("<input />", {
                 type: "button",
                 id: "restartButton",
-                value: "try again!"
+                value: "Try again!"
             });
             var messageContainer = $("<div />", {
                 class: "messageContainer"

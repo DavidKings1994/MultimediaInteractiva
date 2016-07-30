@@ -10130,7 +10130,7 @@
 	    var Detector = __webpack_require__(19);
 	    var LoadingScreen = __webpack_require__( 20);
 	    var GameOverScreen = __webpack_require__( 21);
-	    var Stats = __webpack_require__(23);
+	    var Stats = __webpack_require__(24);
 
 	    var KingsGame = ( function() {
 	        function KingsGame() {
@@ -10523,6 +10523,73 @@
 	        }
 	    };
 
+	    KingsGame.ParticleSystem = function(parameters){
+	        this.sistemType = parameters.sistemType || "rain";
+	        this.gravity = parameters.gravity || new THREE.Vector3();
+	        this.position = parameters.position || new THREE.Vector3();
+	        this.radius = parameters.radius || 5;
+	        this.particleLife = parameters.particleLife || -1;
+	        this.particleCount = parameters.particleCount || 100;
+
+	        var particles = new THREE.Geometry(),
+	        pMaterial = new THREE.PointsMaterial({
+	            color: 0xFFFFFF,
+	            size: 1,
+	            map: new THREE.TextureLoader(KingsGame.manager).load("./assets/textures/particle.png"),
+	            blending: THREE.AdditiveBlending,
+	            transparent: true
+	        });
+
+	        for (var p = 0; p < this.particleCount; p++) {
+	            var pX = Math.random() * (this.radius*2) - this.radius;
+	            var pY = Math.random() * (this.radius*2) - this.radius;
+	            var pZ = Math.random() * (this.radius*2) - this.radius;
+	            var particle = new THREE.Vector3(this.position.x + pX, this.position.y + pY, this.position.z + pZ);
+	            particle.life = this.particleLife;
+	            particles.vertices.push(particle);
+	        }
+
+	        this.particleSystem = new THREE.PointCloud(particles,pMaterial);
+	        this.particleSystem.sortParticles = true;
+	        KingsGame.scene.add(this.particleSystem);
+	    };
+
+	    KingsGame.ParticleSystem.prototype = {
+	        constructor: KingsGame.ParticleSystem,
+
+	        update: function() {
+	            this.particleSystem.position.copy(this.position);
+	            switch (this.sistemType) {
+	                case "rain": {
+	                    var pCount = this.particleCount;
+	                    while (pCount--) {
+	                        var particle = this.particleSystem.geometry.vertices[pCount];
+	                        if (particle.z < -20) {
+	                            particle.z = this.position.z;
+	                        }
+	                        particle.z -= Math.random() * .1;
+	                        particle.add(this.gravity);
+	                    }
+	                    break;
+	                }
+	                case "fountain": {
+	                    var pCount = this.particleCount;
+	                    while (pCount--) {
+	                        var particle = this.particleSystem.geometry.vertices[pCount];
+	                        if (particle.z < -200) {
+	                            particle.z = 200;
+	                        }
+	                        particle.z -= Math.random() * .1;
+	                        particle.add(this.gravity);
+	                    }
+	                    break;
+	                }
+	            }
+	            this.particleSystem.geometry.__dirtyVertices = true;
+	            this.particleSystem.geometry.verticesNeedUpdate = true;
+	        }
+	    };
+
 	    KingsGame.RoadSection = function(parameters) {
 	        this.id = parameters.id;
 	        this.position = parameters.position || new CANNON.Vec3();
@@ -10784,6 +10851,9 @@
 
 	    KingsGame.prototype.update = function () {
 	        KingsGame.stats.update();
+	        KingsGame.rain.position.x = KingsGame.gameobjects.player.position.x;
+	        KingsGame.rain.position.y = KingsGame.gameobjects.player.position.y;
+	        KingsGame.rain.update();
 	        KingsGame.prototype.updatePhysics();
 	        var elements = _.toArray(KingsGame.gameobjects);
 	        for (var i = 0; i < elements.length; i++) {
@@ -10841,10 +10911,6 @@
 	                }
 	            }
 	        } else {
-	            if(!KingsGame.gameOver) {
-	                Backbone.trigger("gameOver");
-	                KingsGame.gameOver = true;
-	            }
 	            KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
 	        }
 	        KingsGame.dirLight.position.set(
@@ -11069,6 +11135,23 @@
 	    	KingsGame.fireBall = new THREE.Mesh( ballGeometry, KingsGame.assets.lavaMaterial );
 	    	KingsGame.fireBall.position.set(0, 165, 0);
 	    	KingsGame.scene.add( KingsGame.fireBall );
+
+	        var groundBody = new CANNON.Body({
+	            mass: 0,
+	            position: new CANNON.Vec3(0,0,-25)
+	        });
+	        var groundShape = new CANNON.Plane();
+	        groundBody.addShape(groundShape);
+	        var callback = function(e) {
+	            if(e.body.name == "player" || e.body.name == "wheel") {
+	                if(!KingsGame.gameOver) {
+	                    Backbone.trigger("gameOver");
+	                    KingsGame.gameOver = true;
+	                }
+	            }
+	        };
+	        groundBody.addEventListener("collide", callback);
+	        KingsGame.world.addBody(groundBody);
 	    };
 
 	    KingsGame.prototype.bumper = function(e){
@@ -11228,6 +11311,12 @@
 	        KingsGame.prototype.loadAssets();
 	        KingsGame.prototype.initGround();
 	        KingsGame.prototype.initGameObjects();
+	        KingsGame.rain = new KingsGame.ParticleSystem({
+	            position: new THREE.Vector3(0,0,10),
+	            gravity: new THREE.Vector3(0,0,-0.8),
+	            particleCount: 10000,
+	            radius: 50
+	        });
 
 	        var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
 	        hemiLight.color.setHSL( 0.6, 1, 0.6 );
@@ -72939,11 +73028,12 @@
 	        },
 	        uploadInformation: function(parameters) {
 	            var self = this;
+	            console.log(parameters);
 	            $.post("./../../php/registro.php",
 	            {
 	                nombre: parameters.name,
-	                puntos: parameters.score,
-	                idPuntuacion: parameters.id,
+	                puntos: parseInt(parameters.score.toString()),
+	                idPuntuacion: parameters.id.toString(),
 	                urlFoto: parameters.url
 	            },
 	            function(data, status){
@@ -73007,7 +73097,7 @@
 	            this.button = $("<input />", {
 	                type: "button",
 	                id: "restartButton",
-	                value: "try again!"
+	                value: "Try again!"
 	            });
 	            var messageContainer = $("<div />", {
 	                class: "messageContainer"
@@ -73044,7 +73134,7 @@
 /* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3),__webpack_require__(24)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone, LeaderBoardRow) {
+	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3),__webpack_require__(23)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone, LeaderBoardRow) {
 	    var leaderBoard = Backbone.View.extend({
 	        tagname: "div",
 	        className: "leaderBoard",
@@ -73069,17 +73159,6 @@
 
 /***/ },
 /* 23 */
-/***/ function(module, exports) {
-
-	// stats.js - http://github.com/mrdoob/stats.js
-	var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
-	if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
-	Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
-	v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
-
-
-/***/ },
-/* 24 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(1),__webpack_require__(3)], __WEBPACK_AMD_DEFINE_RESULT__ = function($, Backbone) {
@@ -73111,6 +73190,17 @@
 	    });
 	    return leaderBoardRow;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__))
+
+
+/***/ },
+/* 24 */
+/***/ function(module, exports) {
+
+	// stats.js - http://github.com/mrdoob/stats.js
+	var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
+	if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
+	Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
+	v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
 
 
 /***/ }
