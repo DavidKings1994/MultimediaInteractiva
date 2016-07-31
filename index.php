@@ -103,7 +103,7 @@
     </div>
     <div id="scoreContainer">
         <div id="score">
-            <span>Puntuacion: </span>
+            <span>Distance: </span>
             <span id="puntuacion">0</span>
         </div>
     </div>

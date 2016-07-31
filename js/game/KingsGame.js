@@ -425,31 +425,57 @@
 
     KingsGame.ParticleSystem = function(parameters){
         this.sistemType = parameters.sistemType || "rain";
+        this.keepAlive = parameters.keepAlive;
         this.gravity = parameters.gravity || new THREE.Vector3();
         this.position = parameters.position || new THREE.Vector3();
+        this.size = parameters.size || 1;
         this.radius = parameters.radius || 5;
+        this.fountainHeight = parameters.fountainHeight || 5;
         this.particleLife = parameters.particleLife || -1;
         this.particleCount = parameters.particleCount || 100;
 
         var particles = new THREE.Geometry(),
         pMaterial = new THREE.PointsMaterial({
             color: 0xFFFFFF,
-            size: 1,
+            size: this.size,
             map: new THREE.TextureLoader(KingsGame.manager).load("./assets/textures/particle.png"),
             blending: THREE.AdditiveBlending,
-            transparent: true
+            transparent: true,
+            depthWrite: false
         });
 
         for (var p = 0; p < this.particleCount; p++) {
-            var pX = Math.random() * (this.radius*2) - this.radius;
-            var pY = Math.random() * (this.radius*2) - this.radius;
-            var pZ = Math.random() * (this.radius*2) - this.radius;
-            var particle = new THREE.Vector3(this.position.x + pX, this.position.y + pY, this.position.z + pZ);
+            var particle;
+            switch (this.sistemType) {
+                case "rain": {
+                    var pX = Math.random() * (this.radius*2) - this.radius;
+                    var pY = Math.random() * (this.radius*2) - this.radius;
+                    var pZ = Math.random() * (this.radius*2) - this.radius;
+                    particle = new THREE.Vector3(this.position.x + pX, this.position.y + pY, this.position.z + pZ);
+                    break;
+                }
+                case "fountain": {
+                    particle = new THREE.Vector3(this.position.x, this.position.y, this.position.z);
+                    var pX = Math.random() * (this.radius*2) - this.radius;
+                    var pY = Math.random() * (this.radius*2) - this.radius;
+                    var pZ = this.fountainHeight * ((Math.random() * 10 - 1) / 10);
+                    particle.velocity = new THREE.Vector3(pX,pY,pZ);
+                    break;
+                }
+                case "explosion": {
+                    particle = new THREE.Vector3(this.position.x, this.position.y, this.position.z);
+                    var pX = Math.random() * (this.radius*2) - this.radius;
+                    var pY = Math.random() * (this.radius*2) - this.radius;
+                    var pZ = Math.random() * (this.radius*2) - this.radius;
+                    particle.velocity = new THREE.Vector3(pX,pY,pZ);
+                    break;
+                }
+            }
             particle.life = this.particleLife;
             particles.vertices.push(particle);
         }
 
-        this.particleSystem = new THREE.PointCloud(particles,pMaterial);
+        this.particleSystem = new THREE.Points(particles,pMaterial);
         this.particleSystem.sortParticles = true;
         KingsGame.scene.add(this.particleSystem);
     };
@@ -458,9 +484,37 @@
         constructor: KingsGame.ParticleSystem,
 
         update: function() {
-            this.particleSystem.position.copy(this.position);
             switch (this.sistemType) {
                 case "rain": {
+                    var pCount = this.particleCount;
+                    while (pCount--) {
+                        var particle = this.particleSystem.geometry.vertices[pCount];
+                        if (particle.z < -20) {
+                            particle.z = this.position.z;
+                        }
+                        particle.z -= Math.random() * .1;
+                    }
+                    break;
+                }
+                case "fountain": {
+                    var pCount = this.particleCount;
+                    while (pCount--) {
+                        var particle = this.particleSystem.geometry.vertices[pCount];
+                        if(this.keepAlive) {
+                            if (particle.z < -15) {
+                                particle.copy(this.position);
+                                var pX = Math.random() * (this.radius*2) - this.radius;
+                                var pY = Math.random() * (this.radius*2) - this.radius;
+                                var pZ = this.fountainHeight * ((Math.random() * 10 - 1) / 10);
+                                particle.velocity = new THREE.Vector3(pX,pY,pZ);
+                            }
+                        }
+                        particle.velocity.add(this.gravity);
+                        particle.add(particle.velocity);
+                    }
+                    break;
+                }
+                case "explosion": {
                     var pCount = this.particleCount;
                     while (pCount--) {
                         var particle = this.particleSystem.geometry.vertices[pCount];
@@ -472,22 +526,14 @@
                     }
                     break;
                 }
-                case "fountain": {
-                    var pCount = this.particleCount;
-                    while (pCount--) {
-                        var particle = this.particleSystem.geometry.vertices[pCount];
-                        if (particle.z < -200) {
-                            particle.z = 200;
-                        }
-                        particle.z -= Math.random() * .1;
-                        particle.add(this.gravity);
-                    }
-                    break;
-                }
             }
             this.particleSystem.geometry.__dirtyVertices = true;
             this.particleSystem.geometry.verticesNeedUpdate = true;
-        }
+        },
+
+        destroy: function() {
+            KingsGame.scene.remove(this.particleSystem);
+        },
     };
 
     KingsGame.RoadSection = function(parameters) {
@@ -751,9 +797,6 @@
 
     KingsGame.prototype.update = function () {
         KingsGame.stats.update();
-        KingsGame.rain.position.x = KingsGame.gameobjects.player.position.x;
-        KingsGame.rain.position.y = KingsGame.gameobjects.player.position.y;
-        KingsGame.rain.update();
         KingsGame.prototype.updatePhysics();
         var elements = _.toArray(KingsGame.gameobjects);
         for (var i = 0; i < elements.length; i++) {
@@ -811,7 +854,24 @@
                 }
             }
         } else {
-            KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+            if(KingsGame.gameobjects.player.position.z < -15 && KingsGame.rain == null) {
+                KingsGame.rain = new KingsGame.ParticleSystem({
+                    sistemType: "fountain",
+                    fountainHeight: 2,
+                    position: KingsGame.gameobjects.player.position.clone(),
+                    gravity: new THREE.Vector3(0,0,-0.08),
+                    particleCount: 300,
+                    radius: 0.5,
+                    keepAlive: false,
+                    size: 5
+                });
+            }
+            if(KingsGame.rain != null) {
+                KingsGame.rain.update();
+                KingsGame.camera.lookAt(KingsGame.rain.position);
+            }else {
+                KingsGame.camera.lookAt(KingsGame.gameobjects.player.position);
+            }
         }
         KingsGame.dirLight.position.set(
             KingsGame.gameobjects.player.position.x,
@@ -1154,6 +1214,11 @@
         KingsGame.road.destroy();
         KingsGame.prototype.initGround();
         KingsGame.gameobjects.player.reset();
+
+        if(KingsGame.rain != null) {
+            KingsGame.rain.destroy();
+            KingsGame.rain = null;
+        }
     };
 
     $.fn.initGame = function( parameters ) {
@@ -1211,12 +1276,6 @@
         KingsGame.prototype.loadAssets();
         KingsGame.prototype.initGround();
         KingsGame.prototype.initGameObjects();
-        KingsGame.rain = new KingsGame.ParticleSystem({
-            position: new THREE.Vector3(0,0,10),
-            gravity: new THREE.Vector3(0,0,-0.8),
-            particleCount: 10000,
-            radius: 50
-        });
 
         var hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
         hemiLight.color.setHSL( 0.6, 1, 0.6 );

@@ -122,7 +122,7 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
                 }
             });
             $(likeButton).attr("data-layout","button_count");
-            $(likeButton).attr("data-href","multimediainteractiva.ga");
+            //$(likeButton).attr("data-href","multimediainteractiva.ga");
             $(likeButton).attr("data-share","true");
             $(likeButton).attr("data-width","450");
             $(likeButton).attr("data-show-faces","true");
