@@ -476,7 +476,7 @@
         pMaterial = new THREE.PointsMaterial({
             color: 0xFFFFFF,
             size: this.size,
-            map: new THREE.TextureLoader(KingsGame.manager).load("./assets/textures/particle.png"),
+            map: KingsGame.assets.particleTexture,
             blending: THREE.AdditiveBlending,
             transparent: true,
             depthWrite: false
@@ -509,6 +509,7 @@
                     break;
                 }
             }
+            particle.active = true;
             particle.life = this.particleLife;
             particles.vertices.push(particle);
         }
@@ -538,7 +539,7 @@
                     var pCount = this.particleCount;
                     while (pCount--) {
                         var particle = this.particleSystem.geometry.vertices[pCount];
-                        if (particle.z < -50) {
+                        if (particle.z < -30) {
                             if(this.keepAlive) {
                                 particle.copy(this.position);
                                 var pX = Math.random() * (this.radius*2) - this.radius;
@@ -546,9 +547,11 @@
                                 var pZ = this.fountainHeight * ((Math.random() * 10 - 1) / 10);
                                 particle.velocity = new THREE.Vector3(pX,pY,pZ);
                             } else {
-                                this.deadParticles++;
+                                if(particle.active) {
+                                    particle.active = false;
+                                    this.deadParticles++;
+                                }
                                 if(this.deadParticles == this.particleCount) {
-                                    console.log("bye bye");
                                     this.destroy();
                                 }
                             }
@@ -589,20 +592,21 @@
 
         if(this.hazard == KingsGame.HAZARDS.pit) {
             var pos = this.position.clone();
+            var length = (this.size.y/3)*2;
             this.groundBody = new CANNON.Body({
                 mass: 0,
-                position: pos.vadd(0,this.size.y/2,0),
+                position: pos.vadd(0,length,0),
                 material: KingsGame.groundMaterial
             });
             var groundShape = new CANNON.Box( new CANNON.Vec3(
                 this.size.x,
-                this.size.y/2,
+                length,
                 this.size.z
             ) );
             this.groundBody.addShape( groundShape );
             KingsGame.world.addBody( this.groundBody );
 
-            var geometry = new THREE.PlaneGeometry( this.size.x * 2, this.size.y );
+            var geometry = new THREE.PlaneGeometry( this.size.x * 2, length * 2 );
             this.mesh = new THREE.Mesh( geometry, KingsGame.assets.groundTexture );
             this.mesh.position.copy( this.groundBody.position );
             this.mesh.quaternion.copy( this.groundBody.quaternion );
@@ -657,8 +661,8 @@
             var posX = Math.floor(Math.random() * 4) + 0;
             this.gameobjects.push(new KingsGame.GameObject({
                 position: this.position.vadd(new CANNON.Vec3(((posX - 2) * 6),this.size.y,0)),
-                scale: new THREE.Vector3(ancho,20,0.1),
-                rotation: new THREE.Vector3(-20,0,0),
+                scale: new THREE.Vector3(ancho,22,0.1),
+                rotation: new THREE.Vector3(-15,0,0),
                 weight: 0,
                 name: "ramp"
             }));
@@ -690,7 +694,7 @@
                 }));
                 var distance = KingsGame.gameobjects.player.position.distanceTo( e.contact.bi.position );
                 console.log(distance);
-                if(distance < 15) {
+                if(distance < 10) {
                     var dx = e.contact.bi.position.x - KingsGame.gameobjects.player.position.x;
                     var dy = e.contact.bi.position.y - KingsGame.gameobjects.player.position.y;
                     var dz = e.contact.bi.position.z - KingsGame.gameobjects.player.position.z;
@@ -698,7 +702,7 @@
                     var worldPoint = new CANNON.Vec3(0,0,0);
                     var impulse = new CANNON.Vec3(dx,dy,dz);
                     impulse.normalize();
-                    impulse = impulse.scale(1000/distance);
+                    impulse = impulse.scale(50/distance);
                     console.log(impulse);
                     KingsGame.gameobjects.player.body.applyImpulse(impulse,worldPoint);
                 }
@@ -815,21 +819,21 @@
                     }
                     switch (this.dificulty) {
                         case KingsGame.DIFICULTY.easy: {
-                            if(this.actualTime > this.pastTime + 3) {
+                            if(this.actualTime > this.pastTime + 1) {
                                 this.placeMeteorite();
                                 this.pastTime = this.actualTime;
                             }
                             break;
                         }
                         case KingsGame.DIFICULTY.medium: {
-                            if(this.actualTime > this.pastTime + 2) {
+                            if(this.actualTime > this.pastTime + 0.5) {
                                 this.placeMeteorite();
                                 this.pastTime = this.actualTime;
                             }
                             break;
                         }
                         case KingsGame.DIFICULTY.hard: {
-                            if(this.actualTime > this.pastTime + 1) {
+                            if(this.actualTime > this.pastTime + 0.2) {
                                 this.placeMeteorite();
                                 this.pastTime = this.actualTime;
                             }
@@ -866,10 +870,19 @@
     KingsGame.Road = function() {
         this.road = [];
         for (var i = 0; i < 4; i++) {
-            this.road.push(new KingsGame.RoadSection({
-                id: i,
-                position: new CANNON.Vec3( 0, i * -100, -10 )
-            }));
+            if(i>1) {
+                this.road.push(new KingsGame.RoadSection({
+                    id: i,
+                    position: new CANNON.Vec3( 0, i * -100, -10 ),
+                    hazard: KingsGame.HAZARDS.meteorites,
+                    dificulty: KingsGame.DIFICULTY.easy
+                }));
+            } else {
+                this.road.push(new KingsGame.RoadSection({
+                    id: i,
+                    position: new CANNON.Vec3( 0, i * -100, -10 )
+                }));
+            }
         }
     };
 
@@ -1148,6 +1161,10 @@
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 0);
             KingsGame.gameobjects.player.vehicle.setSteeringValue(up ? 0 : -KingsGame.gameobjects.player.maxSteerVal, 1);
             break;
+        case 66:
+            KingsGame.gameobjects.player.vehicle.disableMotor(up ? 0 : -KingsGame.gameobjects.player.maxForce, 2);
+            KingsGame.gameobjects.player.vehicle.disableMotor(up ? 0 : KingsGame.gameobjects.player.maxForce, 3);
+            break;
         }
     };
 
@@ -1348,6 +1365,8 @@
     		fragmentShader: document.getElementById( 'fragmentShaderLava' ).textContent,
             side: THREE.DoubleSide
     	});
+
+        KingsGame.assets.particleTexture = new THREE.TextureLoader(KingsGame.manager).load("./assets/textures/particle.png");
     };
 
     KingsGame.prototype.restart = function() {
