@@ -10141,20 +10141,33 @@
 	    }());
 
 	    KingsGame.GameObject = function(parameters) {
+	        this.shape = parameters.shape || "box";
+	        this.material = parameters.material;
 	        this.rotation = parameters.rotation || new THREE.Vector3(0,0,0);
 	        this.scale = parameters.scale || new THREE.Vector3(1,1,1);
 	        this.position = parameters.position || new THREE.Vector3(0,0,0);
 	        this.direction = parameters.direction || new THREE.Vector3(0,-5,0);
 	        this.soundPath = parameters.soundPath || "";
 	        this.bounciness = parameters.bounciness || 0;
-	        this.name = parameters.fileName;
+	        this.name = parameters.name || parameters.fileName;
+
+	        var shape;
+	        switch (this.shape) {
+	            case "box": {
+	                shape = new CANNON.Box( new CANNON.Vec3(
+	                    this.scale.x/2,
+	                    this.scale.y/2,
+	                    this.scale.z/2
+	                ) );
+	                break;
+	            }
+	            case "sphere": {
+	                shape = new CANNON.Sphere( this.scale.x/2 );
+	                break;
+	            }
+	        }
 
 	        var mat = new CANNON.Material();
-	        var shape = new CANNON.Box( new CANNON.Vec3(
-	            this.scale.x/2,
-	            this.scale.y/2,
-	            this.scale.z/2
-	        ) );
 	        this.body = new CANNON.Body({
 	            mass: parameters.weight,
 	            material: mat,
@@ -10189,11 +10202,26 @@
 	                }
 	            }
 	        } else {
-	            this.model = new THREE.Mesh( new THREE.CubeGeometry(
-	                this.scale.x,
-	                this.scale.y,
-	                this.scale.z
-	            ), KingsGame.assets.groundTexture );
+	            var modelShape;
+	            switch (this.shape) {
+	                case "box": {
+	                    modelShape = new THREE.CubeGeometry(
+	                        this.scale.x,
+	                        this.scale.y,
+	                        this.scale.z
+	                    );
+	                    break;
+	                }
+	                case "sphere": {
+	                    modelShape = new THREE.SphereGeometry(this.scale.x,32,32);
+	                    break;
+	                }
+	            }
+	            if(this.material != null) {
+	                this.model = new THREE.Mesh( modelShape, this.material );
+	            } else {
+	                this.model = new THREE.Mesh( modelShape, KingsGame.assets.groundTexture );
+	            }
 	            this.model.position.copy( this.body.position );
 	            this.model.quaternion.copy( this.body.quaternion );
 	            this.model.receiveShadow = true;
@@ -10293,6 +10321,15 @@
 	    		this.model.add( sound );
 	            this.soundAnalyser = new THREE.AudioAnalyser( sound, 32 );
 	        },
+
+	        bindCollideEvent: function(func) {
+	            this.body.addEventListener("collide",func);
+	        },
+
+	        destroy: function() {
+	            KingsGame.scene.remove( this.model );
+	            KingsGame.world.removeBody ( this.body );
+	        }
 	    };
 
 	    KingsGame.Player = function(parameters) {
@@ -10533,6 +10570,7 @@
 	        this.fountainHeight = parameters.fountainHeight || 5;
 	        this.particleLife = parameters.particleLife || -1;
 	        this.particleCount = parameters.particleCount || 100;
+	        this.deadParticles = 0;
 
 	        var particles = new THREE.Geometry(),
 	        pMaterial = new THREE.PointsMaterial({
@@ -10600,13 +10638,19 @@
 	                    var pCount = this.particleCount;
 	                    while (pCount--) {
 	                        var particle = this.particleSystem.geometry.vertices[pCount];
-	                        if(this.keepAlive) {
-	                            if (particle.z < -15) {
+	                        if (particle.z < -50) {
+	                            if(this.keepAlive) {
 	                                particle.copy(this.position);
 	                                var pX = Math.random() * (this.radius*2) - this.radius;
 	                                var pY = Math.random() * (this.radius*2) - this.radius;
 	                                var pZ = this.fountainHeight * ((Math.random() * 10 - 1) / 10);
 	                                particle.velocity = new THREE.Vector3(pX,pY,pZ);
+	                            } else {
+	                                this.deadParticles++;
+	                                if(this.deadParticles == this.particleCount) {
+	                                    console.log("bye bye");
+	                                    this.destroy();
+	                                }
 	                            }
 	                        }
 	                        particle.velocity.add(this.gravity);
@@ -10715,12 +10759,57 @@
 	                position: this.position.vadd(new CANNON.Vec3(((posX - 2) * 6),this.size.y,0)),
 	                scale: new THREE.Vector3(ancho,20,0.1),
 	                rotation: new THREE.Vector3(-20,0,0),
-	                weight: 0
+	                weight: 0,
+	                name: "ramp"
 	            }));
+	        },
+
+	        placeMeteorite: function() {
+	            var pX = Math.random() * (this.size.x*2) - this.size.x;
+	            var pY = Math.random() * (this.size.y*2) - this.size.y;
+	            var pZ = 20;
+	            var position = new THREE.Vector3(this.position.x + pX, this.position.y + pY, this.position.z + pZ);
+	            var father = this;
+	            var self = new KingsGame.GameObject({
+	                position: position,
+	                scale: new THREE.Vector3(1,1,1),
+	                weight: 20,
+	                shape: "sphere",
+	                material: KingsGame.assets.lavaMaterial,
+	            });
+	            self.bindCollideEvent(function(e) {
+	                father.particleSystems.push( new KingsGame.ParticleSystem({
+	                    sistemType: "fountain",
+	                    fountainHeight: 1,
+	                    position: self.position,
+	                    gravity: new THREE.Vector3(0,0,-0.08),
+	                    particleCount: 300,
+	                    radius: 1,
+	                    keepAlive: false,
+	                    size: 3
+	                }));
+	                var distance = KingsGame.gameobjects.player.position.distanceTo( e.contact.bi.position );
+	                console.log(distance);
+	                if(distance < 15) {
+	                    var dx = e.contact.bi.position.x - KingsGame.gameobjects.player.position.x;
+	                    var dy = e.contact.bi.position.y - KingsGame.gameobjects.player.position.y;
+	                    var dz = e.contact.bi.position.z - KingsGame.gameobjects.player.position.z;
+
+	                    var worldPoint = new CANNON.Vec3(0,0,0);
+	                    var impulse = new CANNON.Vec3(dx,dy,dz);
+	                    impulse.normalize();
+	                    impulse = impulse.scale(1000/distance);
+	                    console.log(impulse);
+	                    KingsGame.gameobjects.player.body.applyImpulse(impulse,worldPoint);
+	                }
+	                self.destroy();
+	            });
+	            this.gameobjects.push( self );
 	        },
 
 	        initHazards: function() {
 	            this.gameobjects = [];
+	            this.particleSystems = [];
 	            switch (this.hazard) {
 	                case KingsGame.HAZARDS.bumpers: {
 	                    switch (this.dificulty) {
@@ -10793,7 +10882,7 @@
 	                    }
 	                    break;
 	                }
-	                case KingsGame.HAZARDS.helix: {
+	                case KingsGame.HAZARDS.meteorites: {
 	                    switch (this.dificulty) {
 	                        case KingsGame.DIFICULTY.easy: {
 	                            break;
@@ -10811,7 +10900,57 @@
 	        },
 
 	        update: function() {
+	            switch (this.hazard) {
+	                case KingsGame.HAZARDS.bumpers: {
+	                    if(this.dificulty == KingsGame.DIFICULTY.hard) {
 
+	                    }
+	                    break;
+	                }
+	                case KingsGame.HAZARDS.meteorites: {
+	                    var delta = KingsGame.clock.getDelta();
+	                    if(this.pastTime == null) {
+	                        this.pastTime = 0;
+	                        this.actualTime = delta;
+	                    }
+	                    switch (this.dificulty) {
+	                        case KingsGame.DIFICULTY.easy: {
+	                            if(this.actualTime > this.pastTime + 3) {
+	                                this.placeMeteorite();
+	                                this.pastTime = this.actualTime;
+	                            }
+	                            break;
+	                        }
+	                        case KingsGame.DIFICULTY.medium: {
+	                            if(this.actualTime > this.pastTime + 2) {
+	                                this.placeMeteorite();
+	                                this.pastTime = this.actualTime;
+	                            }
+	                            break;
+	                        }
+	                        case KingsGame.DIFICULTY.hard: {
+	                            if(this.actualTime > this.pastTime + 1) {
+	                                this.placeMeteorite();
+	                                this.pastTime = this.actualTime;
+	                            }
+	                            break;
+	                        }
+	                    }
+	                }
+	                this.actualTime += delta;
+	            }
+	            var elements = _.toArray(this.gameobjects);
+	            for (var i = 0; i < elements.length; i++) {
+	                if(elements[i].name != "ramp") {
+	                    elements[i].update();
+	                }
+	            }
+	            var elements = _.toArray(this.particleSystems);
+	            for (var i = 0; i < elements.length; i++) {
+	                if(elements[i].name != "ramp") {
+	                    elements[i].update();
+	                }
+	            }
 	        },
 
 	        destroy: function() {
@@ -10819,8 +10958,7 @@
 	            KingsGame.scene.remove( this.mesh );
 	            KingsGame.world.removeBody ( this.groundBody );
 	            for (var i = 0; i < this.gameobjects.length; i++) {
-	                KingsGame.scene.remove( this.gameobjects[i].model );
-	                KingsGame.world.removeBody ( this.gameobjects[i].body );
+	                this.gameobjects[i].destroy();
 	            }
 	        },
 	    };
@@ -10842,10 +10980,19 @@
 	            var index = this.locatePlayer();
 	            if(index > this.road.length - 3) {
 	                var _hazard;
-	                if(this.road[3].hazard != KingsGame.HAZARDS.pit && this.road[2].hazard != KingsGame.HAZARDS.pit && this.road[1].hazard != KingsGame.HAZARDS.pit) {
+	                if( this.road[3].hazard != KingsGame.HAZARDS.pit &&
+	                    this.road[2].hazard != KingsGame.HAZARDS.pit &&
+	                    this.road[1].hazard != KingsGame.HAZARDS.pit) {
 	                    _hazard = KingsGame.HAZARDS.pit;
+	                } else if (this.road[3].hazard == KingsGame.HAZARDS.pit) {
+	                    _hazard = KingsGame.HAZARDS.plain;
 	                } else {
-	                    _hazard = KingsGame.HAZARDS.bumpers;
+	                    var rand = Math.floor(Math.random() * 10) + 0;
+	                    if(rand < 6) {
+	                        _hazard = KingsGame.HAZARDS.meteorites;
+	                    } else {
+	                        _hazard = KingsGame.HAZARDS.bumpers;
+	                    }
 	                }
 	                this.road.push(new KingsGame.RoadSection({
 	                    id: this.road[3].id + 1,
@@ -11245,7 +11392,7 @@
 	                modelPath: './assets/models/crate/',
 	                fileName: 'crate',
 	                useMTL: true,
-	                position: new THREE.Vector3(0,-20,2),
+	                position: new THREE.Vector3(0,20,2),
 	                scale: new THREE.Vector3(1,1,1),
 	                weight: 4,
 	                bounciness: 0.9,
@@ -11341,7 +11488,7 @@
 	            "bumpers": 1,
 	            "accelerator": 2,
 	            "pit": 3,
-	            "helix": 4,
+	            "meteorites": 4,
 	        };
 
 	        KingsGame.DIFICULTY = {
