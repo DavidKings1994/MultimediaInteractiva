@@ -16,12 +16,10 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
                 });
 
                 FB.Event.subscribe('auth.login', function(response) {
-                    console.log(response);
                     self.checkLoginState();
                 });
 
                 FB.Event.subscribe('auth.logout', function(response) {
-                    console.log(response);
                     self.checkLoginState();
                 });
 
@@ -41,7 +39,6 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
         },
         uploadInformation: function(parameters) {
             var self = this;
-            console.log(parameters);
             $.post("./../../php/registro.php",
             {
                 nombre: parameters.name,
@@ -56,7 +53,6 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
         downloadInformation: function() {
             $.post("./../../php/consulta.php",{},
             function(json, status){
-                console.log("Data: " + json + "\nStatus: " + status);
                 var query = $.parseJSON(json);
                 var leaderBoard = new LeaderBoard({ data: query });
                 leaderBoard.render();
@@ -88,7 +84,6 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
             });
         },
         statusChangeCallback: function(response) {
-            console.log(response);
             if (response.status === 'connected') {
                 this.testAPI();
             } else if (response.status === 'not_authorized') {

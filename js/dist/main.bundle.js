@@ -10148,7 +10148,9 @@
 	        this.position = parameters.position || new THREE.Vector3(0,0,0);
 	        this.direction = parameters.direction || new THREE.Vector3(0,-5,0);
 	        this.soundPath = parameters.soundPath || "";
+	        this.playSound = parameters.playSound;
 	        this.bounciness = parameters.bounciness || 0;
+	        this.modelPath = parameters.modelPath;
 	        this.name = parameters.name || parameters.fileName;
 
 	        var shape;
@@ -10192,7 +10194,6 @@
 	        if(parameters.modelPath != null) {
 	            var index = KingsGame.prototype.alreadyLoaded(this.name);
 	            if(index >= 0) {
-	                console.log(KingsGame.assets.meshes[index]);
 	                this.initModel(KingsGame.assets.meshes[index].clone(), false);
 	            } else {
 	                if(parameters.useMTL) {
@@ -10226,6 +10227,9 @@
 	            this.model.quaternion.copy( this.body.quaternion );
 	            this.model.receiveShadow = true;
 	            this.model.castShadow = true;
+	            if(this.soundPath != "") {
+	                this.bindSound(this.soundPath);
+	            }
 	            KingsGame.scene.add( this.model );
 	        }
 	    };
@@ -10244,7 +10248,11 @@
 	            this.model.scale.y = this.scale.y;
 	            this.model.scale.z = this.scale.z;
 	            if(this.soundAnalyser != null) {
-	                this.model.children[0].material.emissive.b = this.soundAnalyser.getAverageFrequency() / 256;
+	                if(this.modelPath != null) {
+	                    this.model.children[0].material.emissive.b = this.soundAnalyser.getAverageFrequency() / 256;
+	                } else {
+	                    this.model.material.emissive.b = this.soundAnalyser.getAverageFrequency() / 256;
+	                }
 	            }
 	        },
 
@@ -10312,14 +10320,17 @@
 
 	        bindSound: function(soundPath) {
 	            var audioLoader = new THREE.AudioLoader( KingsGame.manager );
-	            var sound = new THREE.PositionalAudio( KingsGame.listener );
+	            this.sound = new THREE.PositionalAudio( KingsGame.listener );
+	            var self = this;
 	    		audioLoader.load( soundPath, function( buffer ) {
-	    			sound.setBuffer( buffer );
-	    			sound.setRefDistance( 20 );
-	    			sound.play();
+	    			self.sound.setBuffer( buffer );
+	    			self.sound.setRefDistance( 10 );
+	                if(self.playSound) {
+	                    self.sound.play();
+	                }
 	    		});
-	    		this.model.add( sound );
-	            this.soundAnalyser = new THREE.AudioAnalyser( sound, 32 );
+	    		this.model.add( this.sound );
+	            this.soundAnalyser = new THREE.AudioAnalyser( this.sound, 32 );
 	        },
 
 	        bindCollideEvent: function(func) {
@@ -10343,7 +10354,7 @@
 	        this.state = this.STATES.iddle;
 	        this.mass = parameters.weight || 1;
 	        this.maxSteerVal = Math.PI / 8;
-	        this.maxSpeed = 10;
+	        this.maxSpeed = 15;
 	        this.maxForce = 100;
 	        this.turning = 0;
 
@@ -10766,6 +10777,28 @@
 	                weight: 0,
 	                name: "ramp"
 	            }));
+	            this.gameobjects.push(new KingsGame.GameObject({
+	                position: this.position.vadd(new CANNON.Vec3(((posX - 2) * 6),this.size.y + 5,0.01)),
+	                scale: new THREE.Vector3(ancho,10,0.1),
+	                weight: 0,
+	                name: "ramp",
+	                material: KingsGame.assets.acceleratorTexture,
+	                colideEvent: function(e) {
+	                    if(e.body.name == "player" || e.body.name == "wheel") {
+	                        var dir = KingsGame.gameobjects.player.getDirection();
+	                        var vel = new CANNON.Vec3(
+	                            dir.x,
+	                            dir.y,
+	                            dir.z
+	                        );
+	                        vel.normalize();
+	                        vel = vel.scale(50);
+	                        KingsGame.gameobjects.player.body.angularVelocity.set(0,0,0);
+	                        KingsGame.gameobjects.player.body.inertia.set(0,0,0);
+	                        KingsGame.gameobjects.player.body.velocity.copy(vel);
+	                    }
+	                }
+	            }));
 	        },
 
 	        placeMeteorite: function() {
@@ -10780,6 +10813,13 @@
 	                weight: 20,
 	                shape: "sphere",
 	                material: KingsGame.assets.lavaMaterial,
+	                soundPath: './assets/sounds/explosion.mp3',
+	                playSound: false,
+	                material: new THREE.MeshPhongMaterial( {
+	                    color: 0xffaa00,
+	                    shading: THREE.FlatShading,
+	                    shininess: 10
+	                } )
 	            });
 	            self.bindCollideEvent(function(e) {
 	                father.particleSystems.push( new KingsGame.ParticleSystem({
@@ -10793,7 +10833,6 @@
 	                    size: 3
 	                }));
 	                var distance = KingsGame.gameobjects.player.position.distanceTo( e.contact.bi.position );
-	                console.log(distance);
 	                if(distance < 10) {
 	                    var dx = e.contact.bi.position.x - KingsGame.gameobjects.player.position.x;
 	                    var dy = e.contact.bi.position.y - KingsGame.gameobjects.player.position.y;
@@ -10802,10 +10841,10 @@
 	                    var worldPoint = new CANNON.Vec3(0,0,0);
 	                    var impulse = new CANNON.Vec3(dx,dy,dz);
 	                    impulse.normalize();
-	                    impulse = impulse.scale(50/distance);
-	                    console.log(impulse);
+	                    impulse = impulse.scale(40/distance);
 	                    KingsGame.gameobjects.player.body.applyImpulse(impulse,worldPoint);
 	                }
+	                self.sound.play();
 	                self.destroy();
 	            });
 	            this.gameobjects.push( self );
@@ -10920,21 +10959,27 @@
 	                    switch (this.dificulty) {
 	                        case KingsGame.DIFICULTY.easy: {
 	                            if(this.actualTime > this.pastTime + 1) {
-	                                this.placeMeteorite();
+	                                for (var i = 0; i < 1; i++) {
+	                                    this.placeMeteorite();
+	                                }
 	                                this.pastTime = this.actualTime;
 	                            }
 	                            break;
 	                        }
 	                        case KingsGame.DIFICULTY.medium: {
 	                            if(this.actualTime > this.pastTime + 0.5) {
-	                                this.placeMeteorite();
+	                                for (var i = 0; i < 2; i++) {
+	                                    this.placeMeteorite();
+	                                }
 	                                this.pastTime = this.actualTime;
 	                            }
 	                            break;
 	                        }
 	                        case KingsGame.DIFICULTY.hard: {
 	                            if(this.actualTime > this.pastTime + 0.2) {
-	                                this.placeMeteorite();
+	                                for (var i = 0; i < 2; i++) {
+	                                    this.placeMeteorite();
+	                                }
 	                                this.pastTime = this.actualTime;
 	                            }
 	                            break;
@@ -10963,6 +11008,9 @@
 	            KingsGame.world.removeBody ( this.groundBody );
 	            for (var i = 0; i < this.gameobjects.length; i++) {
 	                this.gameobjects[i].destroy();
+	            }
+	            for (var i = 0; i < this.particleSystems.length; i++) {
+	                this.particleSystems[i].destroy();
 	            }
 	        },
 	    };
@@ -11052,11 +11100,10 @@
 	    };
 
 	    KingsGame.prototype.updatePhysics = function () {
-	        KingsGame.world.step( KingsGame.timeStep );
+	        KingsGame.world.step( KingsGame.timeStep, KingsGame.elapsedTime, 10 );
 	    };
 
 	    KingsGame.prototype.update = function () {
-	        KingsGame.stats.update();
 	        KingsGame.prototype.updatePhysics();
 	        var elements = _.toArray(KingsGame.gameobjects);
 	        for (var i = 0; i < elements.length; i++) {
@@ -11144,9 +11191,19 @@
 
 	    KingsGame.prototype.render = function () {
 	        requestAnimationFrame( KingsGame.prototype.render );
-	        if(!KingsGame.paused) {
-	            KingsGame.prototype.update();
-	        }
+	        KingsGame.stats.update();
+
+	        KingsGame.actualTime += KingsGame.clock.getDelta();
+	        KingsGame.elapsedTime = KingsGame.actualTime - KingsGame.pastTime;
+	        KingsGame.pastTime = KingsGame.actualTime;
+	        KingsGame.lag += KingsGame.elapsedTime;
+	        //while (KingsGame.lag >= KingsGame.MS_PER_UPDATE) {
+	            console.log(KingsGame.lag);
+	            if(!KingsGame.paused) {
+	                KingsGame.prototype.update();
+	            }
+	            KingsGame.lag -= KingsGame.MS_PER_UPDATE;
+	        //}
 	        if(KingsGame.ready) {
 	            Backbone.trigger( 'done' );
 	        }
@@ -11272,14 +11329,13 @@
 	        KingsGame.prototype.keyHandler( event );
 	        switch(event.keyCode){
 
-	        case 49: // first person: 1
+	        case 67: // c
 	            var elements = _.toArray(KingsGame.CAMERA_TYPES);
 	            if (KingsGame.camera.type < elements.length - 1 ) {
 	                KingsGame.camera.type++;
 	            } else {
 	                KingsGame.camera.type = 0;
 	            }
-	            console.log(KingsGame.camera.type);
 	            break;
 
 	        case 82: //r
@@ -11445,6 +11501,13 @@
 	            bumpScale  :  0.45,
 	        });
 
+	        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/Supergram1.png" );
+	        KingsGame.assets.acceleratorTexture = new THREE.MeshPhongMaterial({
+	            shininess  :  0.1,
+	            alphaMap   :  smap,
+	            map        :  smap,
+	        });
+
 	        var textureLoader = new THREE.TextureLoader(KingsGame.manager);
 			KingsGame.assets.lavaUniforms = {
 				fogDensity: { value: 0.01 },
@@ -11516,13 +11579,19 @@
 	            "hard": 2
 	        };
 
+	        KingsGame.clock = new THREE.Clock();
+	        KingsGame.actualTime = 0;
+	        KingsGame.pastTime = 0;
+	        KingsGame.elapsedTime = 0;
+	        KingsGame.lag = 0;
+	        KingsGame.MS_PER_UPDATE = 1.0/40.0;
+
 	        KingsGame.ready = false;
 	        KingsGame.gameOver = false;
 	        KingsGame.score = 0;
 	        KingsGame.timeStep = 1.0 / 60.0;
 	        KingsGame.paused = false;
 	        KingsGame.firstPerson = false;
-	        KingsGame.clock = new THREE.Clock();
 	        KingsGame.pointerLocked = parameters.pointerLocked;
 	        KingsGame.prototype.lockPointer();
 
@@ -11606,10 +11675,10 @@
 
 	        var audioLoader = new THREE.AudioLoader(KingsGame.manager);
 	        var sound = new THREE.Audio( KingsGame.listener );
-			audioLoader.load( './assets/sounds/running_hell.mp3', function( buffer ) {
+			audioLoader.load( './assets/sounds/Main Entrance.mp3', function( buffer ) {
 				sound.setBuffer( buffer );
 				sound.setLoop(true);
-				sound.setVolume(0.0);
+				sound.setVolume(0.3);
 				sound.play();
 			});
 
@@ -73228,12 +73297,10 @@
 	                });
 
 	                FB.Event.subscribe('auth.login', function(response) {
-	                    console.log(response);
 	                    self.checkLoginState();
 	                });
 
 	                FB.Event.subscribe('auth.logout', function(response) {
-	                    console.log(response);
 	                    self.checkLoginState();
 	                });
 
@@ -73253,7 +73320,6 @@
 	        },
 	        uploadInformation: function(parameters) {
 	            var self = this;
-	            console.log(parameters);
 	            $.post("./../../php/registro.php",
 	            {
 	                nombre: parameters.name,
@@ -73268,7 +73334,6 @@
 	        downloadInformation: function() {
 	            $.post("./../../php/consulta.php",{},
 	            function(json, status){
-	                console.log("Data: " + json + "\nStatus: " + status);
 	                var query = $.parseJSON(json);
 	                var leaderBoard = new LeaderBoard({ data: query });
 	                leaderBoard.render();
@@ -73300,7 +73365,6 @@
 	            });
 	        },
 	        statusChangeCallback: function(response) {
-	            console.log(response);
 	            if (response.status === 'connected') {
 	                this.testAPI();
 	            } else if (response.status === 'not_authorized') {
