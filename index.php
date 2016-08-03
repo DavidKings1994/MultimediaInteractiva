@@ -98,7 +98,7 @@
         <div id="instructions">
             <span>Click to play</span>
             <br />
-            (W, A, S, D = Move, 1 = change camera)
+            (W, A, S, D = Move, C = Change camera, R = Reset)
         </div>
     </div>
     <div id="scoreContainer">
