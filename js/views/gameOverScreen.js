@@ -94,6 +94,7 @@ define(['jquery','Backbone','./leaderBoard/leaderBoard'], function($, Backbone, 
         },
         showScreen: function() {
             $(".gameOverScreen").css("display", "block");
+            this.downloadInformation();
         },
         hideScreen: function() {
             $(".gameOverScreen").css("display", "none");
