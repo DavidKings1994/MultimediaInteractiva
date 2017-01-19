@@ -633,9 +633,15 @@
             this.groundBody.addShape( groundShape );
             KingsGame.world.addBody( this.groundBody );
 
+            var pos = this.position.clone();
+            pos.set(
+                this.position.x,
+                this.position.y,
+                this.position.z + 0.8
+            )
             var geometry = new THREE.PlaneGeometry( this.size.x * 2, this.size.y * 2 );
             this.mesh = new THREE.Mesh( geometry, KingsGame.assets.groundTexture );
-            this.mesh.position.copy( this.groundBody.position );
+            this.mesh.position.copy( pos );
             this.mesh.quaternion.copy( this.groundBody.quaternion );
             this.mesh.receiveShadow = true;
             KingsGame.scene.add( this.mesh );
@@ -675,7 +681,8 @@
                 scale: new THREE.Vector3(ancho,22,0.1),
                 rotation: new THREE.Vector3(-15,0,0),
                 weight: 0,
-                name: "ramp"
+                name: "ramp",
+                material: KingsGame.assets.acceleratorTexture
             }));
             this.gameobjects.push(new KingsGame.GameObject({
                 position: this.position.vadd(new CANNON.Vec3(((posX - 2) * 6),this.size.y + 5,0.01)),
@@ -1401,7 +1408,7 @@
             bumpScale  :  0.45,
         });
 
-        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/Supergram1.png" );
+        var smap = new THREE.TextureLoader(KingsGame.manager).load( "./assets/textures/accel.jpg" );
         KingsGame.assets.acceleratorTexture = new THREE.MeshPhongMaterial({
             shininess  :  0.1,
             alphaMap   :  smap,
